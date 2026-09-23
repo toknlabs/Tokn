@@ -68,6 +68,16 @@ export async function loadConfig(): Promise<Config> {
   }
 }
 
+/** The host on disk, ignoring TOKN_HOST. */
+async function storedHost(): Promise<string> {
+  try {
+    const parsed = JSON.parse(await fs.readFile(configPath(), "utf8")) as Partial<Config>;
+    return parsed.host ?? DEFAULT_HOST;
+  } catch {
+    return DEFAULT_HOST;
+  }
+}
+
 /** Env var wins over the stored host so CI and local dev can retarget easily. */
 function resolveHost(stored: string | undefined): string {
   return process.env.TOKN_HOST ?? stored ?? DEFAULT_HOST;
@@ -76,7 +86,13 @@ function resolveHost(stored: string | undefined): string {
 export async function saveConfig(config: Config): Promise<void> {
   const dir = configDir();
   await fs.mkdir(dir, { recursive: true, mode: 0o700 });
-  const body = JSON.stringify(config, null, 2) + "\n";
+  // `loadConfig` folds TOKN_HOST into `host`, and every command saves the
+  // config it loaded. Writing that back would turn a one-off override into
+  // the permanent host, so a single `TOKN_HOST=… tokn sync` left the CLI
+  // pointed at a dev server. Keep whatever host was stored instead.
+  const override = process.env.TOKN_HOST;
+  const host = override && config.host === override ? await storedHost() : config.host;
+  const body = JSON.stringify({ ...config, host }, null, 2) + "\n";
   await fs.writeFile(configPath(), body, { mode: 0o600 });
   // mkdir/writeFile only apply the mode on creation; enforce it every time in
   // case the file predates this logic or was copied in with looser bits.
