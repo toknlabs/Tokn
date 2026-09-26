@@ -1,0 +1,11 @@
+{
+  "claude-opus-5": { "cacheWrite1h": 10, "fastInput": 10, "fastOutput": 50 },
+  "claude-opus-4-8": { "cacheWrite1h": 10, "fastInput": 10, "fastOutput": 50 },
+  "claude-opus-4-7": { "cacheWrite1h": 10 },
+  "claude-opus-4-6": { "cacheWrite1h": 10 },
+  "claude-sonnet-5": { "cacheWrite1h": 4 },
+  "claude-sonnet-4-6": { "cacheWrite1h": 6 },
+  "claude-haiku-4-5": { "cacheWrite1h": 2 },
+  "claude-fable-5": { "cacheWrite1h": 20 },
+  "claude-fable-5-1": { "cacheWrite1h": 20, "cacheRead": 0.25 }
+}

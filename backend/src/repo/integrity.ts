@@ -1,3 +1,4 @@
+import { normalizeModelId } from "../../../pricing/catalog.ts";
 import type { SyncRow } from "./usage.ts";
 import { pricingTable, type CliPrice } from "./pricing.ts";
 
@@ -128,8 +129,8 @@ function tokensIn(row: SyncRow): number {
  * Silently dropping them would leave an honest user staring at a total that
  * does not match their machine with no way to find out why.
  */
-export async function assess(rows: SyncRow[]): Promise<Assessment> {
-  const prices = await pricingTable();
+export async function assess(rows: SyncRow[], prices?: Record<string, CliPrice>): Promise<Assessment> {
+  const rateTable = prices ?? (await pricingTable());
   const out: SyncRow[] = [];
   const rejected: Rejected[] = [];
   let costUsd = 0;
@@ -181,7 +182,7 @@ export async function assess(rows: SyncRow[]): Promise<Assessment> {
     // an invented cost would be worse than storing nothing, and storing it at
     // zero would quietly let an unpriced model carry unlimited tokens onto the
     // board for free.
-    const price = prices[row.model];
+    const price = rateTable[row.model] ?? rateTable[normalizeModelId(row.model)];
     if (!price) {
       reject("unpriceable-model", `no published rate for ${row.model}`);
       continue;

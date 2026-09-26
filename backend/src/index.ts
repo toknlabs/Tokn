@@ -34,5 +34,10 @@ export * from "./repo/anatomy.ts";
 export * from "./repo/whatif.ts";
 export * from "./repo/leaderboard.ts";
 export * from "./repo/pricing.ts";
+export {
+  pricingRefreshPlan,
+  pricingTableForCli,
+  refreshPricingFromCatalog,
+} from "./refresh-pricing.ts";
 export * from "./service.ts";
 export * from "./passkey-service.ts";

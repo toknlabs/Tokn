@@ -2,57 +2,86 @@
  * Model prices, in US dollars per million tokens.
  *
  * GENERATED FILE — do not edit by hand. Regenerate with:
- *   node scripts/gen-pricing.mjs
+ *   npm run pricing
  *
- * Source: the models.dev catalog (702 models across 25
- * providers), spot-checked against Anthropic's published rates. Model ids are
- * stored normalized: provider prefixes, Bedrock version suffixes, Vertex
- * @-versions and dated snapshots are all stripped, so every spelling of a model
- * resolves to one row.
+ * Source: the models.dev catalog (731 models across 25
+ * providers), built by `pricing/catalog.ts` and patched with
+ * `pricing/overrides.json`. Model ids are stored normalized: provider
+ * prefixes, Bedrock version suffixes, Vertex @-versions and dated snapshots
+ * are stripped, so every spelling of a model resolves to one row. A leading
+ * `~` is kept, which is why aliases like `~openai/gpt-luna-latest` stay
+ * distinct from `gpt-6-luna`.
  *
  * Tuple layout: [input, output, cacheRead?, cacheWrite?]
  * A missing cacheRead/cacheWrite means the provider publishes no separate cache
  * rate, and `pricing.ts` falls back to sensible multiples of the input rate.
+ * `PRICING_OVERRIDES` carries what the catalog cannot: Anthropic's 1-hour
+ * cache tier and fast mode.
  *
  * This table is the offline fallback. `tokn sync` refreshes it from the
  * dashboard so a model released after this CLI shipped is still priced.
  */
 
-export const CATALOG_GENERATED_AT = "2026-09-18";
+export const CATALOG_GENERATED_AT = "2026-09-25";
+
+export const PRICING_OVERRIDES: Record<
+  string,
+  {
+    cacheRead?: number;
+    cacheWrite?: number;
+    cacheWrite1h?: number;
+    fast?: { input: number; output: number };
+  }
+> = {
+  "claude-fable-5": { cacheWrite1h: 20 },
+  "claude-fable-5-1": { cacheRead: 0.25, cacheWrite1h: 20 },
+  "claude-haiku-4-5": { cacheWrite1h: 2 },
+  "claude-opus-4-6": { cacheWrite1h: 10 },
+  "claude-opus-4-7": { cacheWrite1h: 10 },
+  "claude-opus-4-8": { cacheWrite1h: 10, fast: { input: 10, output: 50 } },
+  "claude-opus-5": { cacheWrite1h: 10, fast: { input: 10, output: 50 } },
+  "claude-sonnet-4-6": { cacheWrite1h: 6 },
+  "claude-sonnet-5": { cacheWrite1h: 4 },
+};
 
 export const CATALOG: Record<string, number[]> = {
   "~anthropic/claude-fable-latest": [10,50,0.25,12.5],
   "~anthropic/claude-haiku-latest": [1,5,0.1,1.25],
-  "~anthropic/claude-opus-latest": [5,25,0.5,6.25],
+  "~anthropic/claude-opus-latest": [4,20,0.2,5],
   "~anthropic/claude-sonnet-latest": [2,10,0.2,2.5],
-  "~deepseek/deepseek-flash-latest": [0.135,0.54,0.00405],
-  "~deepseek/deepseek-pro-latest": [0.57816,1.73448,0.018396],
-  "~deepseek/deepseek-v4-flash-latest": [0.05324,0.15972,0.001694],
+  "~deepseek/deepseek-flash-latest": [0.04,0.49,0.01],
+  "~deepseek/deepseek-pro-latest": [0.09984,2.88,0.08832],
+  "~deepseek/deepseek-v4-flash-latest": [0.03,0.32,0.016],
   "~google/gemini-flash-latest": [0.75,3.75,0.075,0.041667],
   "~google/gemini-pro-latest": [2,12,0.2,0.375],
-  "~moonshotai/kimi-latest": [1.95,10.92,0.2262],
+  "~moonshotai/kimi-latest": [0.8845,10.5346,0.33],
   "~openai/gpt-astra-latest": [10,50,1,12.5],
-  "~openai/gpt-luna-latest": [0.2,1.2,0.02,0.25],
+  "~openai/gpt-luna-latest": [0.1,0.5,0.01,0.125],
   "~openai/gpt-mini-latest": [0.75,4.5,0.075],
   "~openai/gpt-sol-latest": [2,10,0.2,2.5],
   "~openai/gpt-terra-latest": [2,12,0.2,2.5],
-  "~x-ai/grok-latest": [2,6,0.5],
-  "~z-ai/glm-flash-latest": [0.075,0.25,0.015],
-  "~z-ai/glm-latest": [0.8918,2.8028,0.16562],
+  "~x-ai/grok-latest": [1.6,4.8,0.4],
+  "~z-ai/glm-flash-latest": [0.045,0.14,0.01],
+  "~z-ai/glm-latest": [0.5614,1.7644,0.10426],
   "aion-2.0": [0.8,1.6,0.2],
   "aion-3.0": [3,6,0.75],
   "aion-3.0-mini": [0.7,1.4,0.18],
+  "aion-3.5": [3,6,0.75],
+  "aion-3.5-mini": [0.7,1.4,0.18],
   "aion-rp-llama-3.1-8b": [0.8,1.6],
   "amazon.nova-2-lite": [0.374,3.157,0.0935,0.374],
   "amazon.nova-lite": [0.069,0.276,0.01725,0.069],
-  "amazon.nova-micro": [0.035,0.14,0.00875,0.035],
+  "amazon.nova-micro": [0.037,0.148,0.00925,0.037],
   "amazon.nova-premier": [2.5,12.5,0.625,2.5],
-  "amazon.nova-pro": [0.92,3.68,0.23,0.92],
+  "amazon.nova-pro": [0.8,3.2,0.2,0.8],
+  "arrow-2": [4,20,0.4,5],
+  "arrow-2-telos": [6,30,0.6,7.5],
   "au.anthropic.claude-haiku-4-5": [1.1,5.5,0.11,1.375],
   "au.anthropic.claude-opus-4-6": [5.5,27.5,0.55,6.875],
   "au.anthropic.claude-opus-4-7": [5.5,27.5,0.55,6.875],
   "au.anthropic.claude-opus-4-8": [5.5,27.5,0.55,6.875],
   "au.anthropic.claude-opus-5": [5.5,27.5,0.55,6.875],
+  "au.anthropic.claude-opus-5-5": [4.4,22,0.22,5.5],
   "au.anthropic.claude-sonnet-4-5": [3.3,16.5,0.33,4.125],
   "au.anthropic.claude-sonnet-4-6": [3.3,16.5,0.33,4.125],
   "au.anthropic.claude-sonnet-5": [2.2,11,0.22,2.75],
@@ -77,7 +106,10 @@ export const CATALOG: Record<string, number[]> = {
   "claude-opus-4.8": [5,25,0.5,6.25],
   "claude-opus-4.8-fast": [10,50,1,12.5],
   "claude-opus-5": [5,25,0.5,6.25],
+  "claude-opus-5-5": [4,20,0.2,5],
   "claude-opus-5-fast": [10,50,1,12.5],
+  "claude-opus-5.5": [4,20,0.2,5],
+  "claude-opus-5.5-fast": [8,40,0.4,10],
   "claude-sonnet-4": [3,15,0.3,3.75],
   "claude-sonnet-4-5": [3,15,0.3,3.75],
   "claude-sonnet-4-6": [3,15,0.3,3.75],
@@ -95,6 +127,7 @@ export const CATALOG: Record<string, number[]> = {
   "cohere-embed-v3-multilingual": [0.1,0],
   "command-a": [2.5,10],
   "command-a-03-2025": [2.5,10],
+  "command-a-plus": [0.3,1.5,0.15],
   "command-a-plus-05-2026": [2.5,10],
   "command-a-reasoning-08-2025": [2.5,10],
   "command-a-translate-08-2025": [2.5,10],
@@ -139,12 +172,14 @@ export const CATALOG: Record<string, number[]> = {
   "devstral-small-2505": [0.1,0.3],
   "devstral-small-2507": [0.1,0.3],
   "dolphin-mistral-24b-venice-edition": [0.2,0.9],
+  "ember-1": [3,15,0.3],
   "ernie-4.5-vl-424b-a47b": [0.42,1.25],
   "fireworks/models/deepseek-v4-flash-0731": [0.22,0.66,0.007],
   "fireworks/models/deepseek-v4-flash-vision-exp": [0.22,0.66,0.007],
   "fireworks/models/deepseek-v4-pro": [1.2,1.2,0.6],
   "fireworks/models/deepseek-v4-pro-0813": [1.32,3.96,0.044],
   "fireworks/models/deepseek-v4p1-flash": [0.22,0.66,0.007],
+  "fireworks/models/ember-1": [3,15,0.3],
   "fireworks/models/glm-5p2": [1.4,4.4,0.14],
   "fireworks/models/glm-5p3": [1.4,4.4,0.26],
   "fireworks/models/glm-5p3-flash": [0.15,0.5,0.03],
@@ -207,6 +242,8 @@ export const CATALOG: Record<string, number[]> = {
   "gemini-3.6-flash": [0.75,3.75,0.075],
   "gemini-3.7-flash": [0.75,3.75,0.075],
   "gemini-3.8-flash": [0.75,3.75,0.075],
+  "gemini-3.8-flash-lite-tts": [0.5,6,0.125],
+  "gemini-3.8-flash-tts": [0.5,9,0.125],
   "gemini-3.8-live": [0.75,4.5],
   "gemini-3.8-live-extended-thinking": [0.75,4.5],
   "gemini-embedding-001": [0.15,0],
@@ -239,8 +276,9 @@ export const CATALOG: Record<string, number[]> = {
   "glm-5.2-maas": [1.4,4.4,0.14],
   "glm-5.3": [1.4,4.4,0.26,0],
   "glm-5.3-fast": [2.1,6.6,0.21],
-  "glm-5.3-flash": [0.075,0.25,0.015,0],
-  "glm-5.3-flashx": [0.37,1.25,0.075],
+  "glm-5.3-flash": [0.15,0.5,0.03,0],
+  "glm-5.3-flashx": [0.37,1.25,0.075,0],
+  "glm-5.3-prime": [2.8,8.8,0.56],
   "glm-5v-turbo": [5,22,1.2,0],
   "google.gemma-3-12b-it": [0.09,0.29],
   "google.gemma-3-27b-it": [0.23,0.38],
@@ -313,7 +351,7 @@ export const CATALOG: Record<string, number[]> = {
   "gpt-5.6-luna-fast": [0.4,2.4,0.04,0.5],
   "gpt-5.6-luna-pro": [0.2,1.2,0.02,0.25],
   "gpt-5.6-sol": [4,20,0.4,5],
-  "gpt-5.6-sol-fast": [4,20,0.4,5],
+  "gpt-5.6-sol-fast": [8,40,0.8,10],
   "gpt-5.6-sol-pro": [2,10,0.2,2.5],
   "gpt-5.6-terra": [2,12,0.2,2.5],
   "gpt-5.6-terra-fast": [4,24,0.4,5],
@@ -321,6 +359,12 @@ export const CATALOG: Record<string, number[]> = {
   "gpt-6-astra": [10,50,1,12.5],
   "gpt-6-astra-fast": [20,100,2,25],
   "gpt-6-astra-pro": [10,50,1,12.5],
+  "gpt-6-luna": [0.1,0.5,0.01,0.125],
+  "gpt-6-luna-fast": [0.2,1,0.02,0.25],
+  "gpt-6-luna-pro": [0.1,0.5,0.01,0.125],
+  "gpt-6-sol": [2,10,0.2,2.5],
+  "gpt-6-sol-fast": [4,20,0.4,5],
+  "gpt-6-sol-pro": [2,10,0.2,2.5],
   "gpt-audio": [2.5,10],
   "gpt-audio-mini": [0.6,2.4],
   "gpt-chat-latest": [5,30,0.5],
@@ -361,6 +405,7 @@ export const CATALOG: Record<string, number[]> = {
   "grok-4.3": [1.25,2.5,0.2],
   "grok-4.5": [2,6,0.3],
   "grok-4.6": [2,6,0.5],
+  "grok-4.7": [2,6,0.5],
   "grok-build-0.1": [1,2,0.2],
   "hermes-3-llama-3.1-405b": [1,1],
   "hermes-3-llama-3.1-70b": [0.7,0.7],
@@ -372,7 +417,7 @@ export const CATALOG: Record<string, number[]> = {
   "hy-mt2-lite": [0.044,0.177],
   "hy-mt2-plus": [0.074,0.295],
   "hy-mt2-pro": [0.074,0.295],
-  "hy3": [0.14,0.58,0.035],
+  "hy3": [0.13,0.53,0.033],
   "hy3-preview": [0.18,0.6,0.06],
   "hy4-preview": [0.834,2.501,0.042],
   "in.openai.gpt-5.6-luna": [0.22,1.32,0.022,0.275],
@@ -380,17 +425,15 @@ export const CATALOG: Record<string, number[]> = {
   "inkling": [0.95,4.05,0.16],
   "inkling-small": [0.45,1.2,0.1],
   "interfaze-beta": [1.5,3.5],
-  "jev": [0.042,0],
-  "jev-latest": [0.042,0],
   "jp.amazon.nova-2-lite": [0.396,3.311,0.099,0.396],
   "jp.anthropic.claude-haiku-4-5": [1.1,5.5,0.11,1.375],
   "jp.anthropic.claude-opus-4-7": [5.5,27.5,0.55,6.875],
   "jp.anthropic.claude-opus-4-8": [5.5,27.5,0.55,6.875],
   "jp.anthropic.claude-opus-5": [5.5,27.5,0.55,6.875],
+  "jp.anthropic.claude-opus-5-5": [4.4,22,0.22,5.5],
   "jp.anthropic.claude-sonnet-4-5": [3.3,16.5,0.33,4.125],
   "jp.anthropic.claude-sonnet-4-6": [3.3,16.5,0.33,4.125],
   "jp.anthropic.claude-sonnet-5": [2.2,11,0.22,2.75],
-  "kat-coder-pro": [0.3,1.2,0.06],
   "kat-coder-pro-v2.5": [0.74,2.96,0.15],
   "kimi-k2": [0.57,2.3],
   "kimi-k2-0905": [0.6,2.5],
@@ -447,6 +490,9 @@ export const CATALOG: Record<string, number[]> = {
   "meta.llama4-scout-17b-instruct": [0.17,0.66],
   "mimo-v2.5": [0.14,0.28,0.0028],
   "mimo-v2.5-pro": [1,3,0.2],
+  "mimo-v2.6-flash": [0.14,0.28,0.0028],
+  "mimo-v2.6-pro": [0.435,0.87,0.0036],
+  "mimo-v2.6-pro-ultraspeed": [4.35,8.7,0.036],
   "minimax-01": [0.2,1.1],
   "minimax-m1": [0.4,2.2],
   "minimax-m2": [0.3,1.2],
@@ -507,9 +553,10 @@ export const CATALOG: Record<string, number[]> = {
   "model-router": [0.14,0],
   "moonshot.kimi-k2-thinking": [0.6,2.5],
   "moonshotai.kimi-k2.5": [0.6,3],
+  "moonshotai.kimi-k3": [3.3,16.5,0.33,4.125],
   "morph-v3-fast": [0.8,1.2],
   "morph-v3-large": [0.9,1.9],
-  "muse-glimmer-30b": [0.35,1.5,0.04],
+  "muse-glimmer-30b": [0.3,1.2,0.04],
   "muse-spark-1.1": [1.25,4.25,0.15],
   "muse-spark-1.2": [1.25,4.25,0.15],
   "muse-spark-1.2-contributor": [0.1,0.2,0.002],
@@ -520,7 +567,7 @@ export const CATALOG: Record<string, number[]> = {
   "nemotron-3-nano-30b-a3b": [0.05,0.2,0.025],
   "nemotron-3-nano-omni-30b-a3b-reasoning": [0.2,0.8],
   "nemotron-3-super-120b-a12b": [0.08,0.45],
-  "nemotron-3-ultra-550b-a55b": [0.625,3.125,0.1875],
+  "nemotron-3-ultra-550b-a55b": [0.6,2.4,0.12],
   "nemotron-3.5-content-safety": [0.2,0.2],
   "nemotron-3.5-lightning": [0.08,0.2,0.04],
   "nemotron-nano-12b-v2-vl": [0.2,0.6],
@@ -550,10 +597,12 @@ export const CATALOG: Record<string, number[]> = {
   "open-mixtral-8x7b": [0.7,0.7],
   "openai.gpt-5.4": [2.75,16.5,0.275],
   "openai.gpt-5.5": [5.5,33,0.55],
-  "openai.gpt-5.6-luna": [0.2,1.2,0.02,0.25],
+  "openai.gpt-5.6-luna": [0.22,1.32,0.022,0.275],
   "openai.gpt-5.6-sol": [4.4,22,0.44,5.5],
   "openai.gpt-5.6-terra": [2.2,13.2,0.22,2.75],
-  "openai.gpt-6-astra": [11,55,1.1,13.75],
+  "openai.gpt-6-astra": [10,50,1,12.5],
+  "openai.gpt-6-luna": [0.11,0.55,0.011,0.1375],
+  "openai.gpt-6-sol": [2,10,0.2,2.5],
   "openai.gpt-oss-120b": [0.15,0.6],
   "openai.gpt-oss-120b-1:0": [0.15,0.6],
   "openai.gpt-oss-20b": [0.07,0.3],
@@ -617,7 +666,7 @@ export const CATALOG: Record<string, number[]> = {
   "qwen3-235b-a22b-thinking": [0.4,4],
   "qwen3-235b-a22b-thinking-2507": [0.23,2.3],
   "qwen3-30b-a3b": [0.12,0.5],
-  "qwen3-30b-a3b-instruct-2507": [0.04815,0.19305],
+  "qwen3-30b-a3b-instruct-2507": [0.1,0.3],
   "qwen3-30b-a3b-thinking-2507": [0.2,2.4],
   "qwen3-32b": [0.7,2.8],
   "qwen3-8b": [0.18,0.7],
@@ -642,7 +691,7 @@ export const CATALOG: Record<string, number[]> = {
   "qwen3-vl-235b-a22b-instruct": [0.2,0.88,0.11],
   "qwen3-vl-235b-a22b-thinking": [0.4,4],
   "qwen3-vl-30b-a3b": [0.2,0.8],
-  "qwen3-vl-30b-a3b-instruct": [0.13,0.52],
+  "qwen3-vl-30b-a3b-instruct": [0.15,0.6],
   "qwen3-vl-30b-a3b-thinking": [0.2,2.4],
   "qwen3-vl-32b-instruct": [0.104,0.416],
   "qwen3-vl-8b-instruct": [0.117,0.455],
@@ -672,6 +721,7 @@ export const CATALOG: Record<string, number[]> = {
   "qwen3.8-flash": [0.15,0.47,0.016,0.2],
   "qwen3.8-max": [2,6,0.25,2.5],
   "qwen3.8-max-0902": [2,6,0.25,2.5],
+  "qwen3.8-max-prime": [4,12,0.5],
   "qwen3.8-omni-flash": [0.15,0.47,0.016],
   "qwq-plus": [0.8,2.4],
   "reka-edge": [0.1,0.1],
@@ -692,6 +742,7 @@ export const CATALOG: Record<string, number[]> = {
   "seed-2.0-pro": [0.5,3,0.1],
   "seed-2.1-turbo": [0.5,2.5,0.1],
   "skyfall-36b": [0.55,0.8,0.25],
+  "solar-mini4": [0.05,0.2,0.005],
   "solar-pro-3": [0.15,0.6,0.015],
   "solar-pro4": [0.09,0.36,0.018],
   "sonar": [1,1],
@@ -701,10 +752,12 @@ export const CATALOG: Record<string, number[]> = {
   "sonar-reasoning-pro": [2,8],
   "step-3.5-flash": [0.1,0.3],
   "step-3.7-flash": [0.2,1.15,0.04],
+  "step-5-preview": [1,2.7,0.05],
   "ternary-bonsai-2-27b": [0.075,0.5],
   "text-embedding-3-large": [0.13,0],
   "text-embedding-3-small": [0.02,0],
   "text-embedding-ada-002": [0.1,0],
+  "toast-1": [0.3,0.72,0.036],
   "trinity-large-thinking": [0.25,0.8,0.06],
   "ui-tars-1.5-7b": [0.1,0.2,0.1],
   "unslopnemo-12b": [0.4,0.4],

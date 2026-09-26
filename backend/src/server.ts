@@ -1,7 +1,7 @@
 import http from "node:http";
 import { ENV } from "./env.ts";
 import { cliLink, cliMe, cliSync } from "./service.ts";
-import { pricingTable } from "./repo/pricing.ts";
+import { pricingTableForCli, refreshPricingFromCatalog } from "./refresh-pricing.ts";
 import { leaderboard, globalStats } from "./repo/leaderboard.ts";
 import { findProfileByHandle } from "./repo/profiles.ts";
 import { profilePayload } from "./service.ts";
@@ -59,11 +59,19 @@ const routes: { method: string; path: string | RegExp; handler: Handler }[] = [
   {
     method: "GET",
     path: "/api/cli/pricing",
-    handler: async () => ({
-      status: 200,
-      body: { models: await pricingTable(), updatedAt: new Date().toISOString() },
-      headers: { "cache-control": "public, max-age=3600" },
-    }),
+    handler: async () => {
+      const { models, plan } = await pricingTableForCli();
+      if (plan === "stale") {
+        void refreshPricingFromCatalog().catch((error: unknown) => {
+          console.error(error instanceof Error ? error.message : String(error));
+        });
+      }
+      return {
+        status: 200,
+        body: { models, updatedAt: new Date().toISOString() },
+        headers: { "cache-control": "public, max-age=3600" },
+      };
+    },
   },
   {
     method: "GET",

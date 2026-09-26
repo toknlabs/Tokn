@@ -218,11 +218,13 @@ provider here already bills them inside `output`.
 
 ## Pricing
 
-701 models across 25 providers, generated from the
-[models.dev](https://models.dev) catalog and spot-checked against Anthropic's
-published rates. Model ids are normalized before lookup, so dated snapshots
+Generated from the [models.dev](https://models.dev) catalog by the shared
+builder in [`pricing/`](../pricing/README.md), and spot-checked against
+Anthropic's published rates. `npm run pricing` rewrites `src/core/pricing-data.ts`.
+Model ids are normalized before lookup, so dated snapshots
 (`claude-haiku-4-5-20251001`), Bedrock prefixes (`us.anthropic.…`), Vertex
-`@`-versions and `vendor/model` spellings all resolve to one row.
+`@`-versions and `vendor/model` spellings all resolve to one row. A leading
+`~` is kept, so an alias like `~openai/gpt-luna-latest` stays its own row.
 
 Where a provider publishes explicit cache rates we use them; otherwise:
 
@@ -386,5 +388,6 @@ TOKN_HOST=https://your-host tokn link
 npm install
 npm run build
 npm run pricing      # regenerate the model price table from models.dev
+npm test             # lookup against the generated catalog
 node dist/index.js scan
 ```

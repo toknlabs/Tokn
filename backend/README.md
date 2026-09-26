@@ -81,20 +81,25 @@ rejected.
 
 ## Pricing
 
-`npm run seed:pricing` loads ~700 models from the
-[models.dev](https://models.dev) catalog — the same source the CLI generates its
-offline fallback from, so the two agree.
+Rates are built once, in [`pricing/`](../pricing/README.md). `npm run seed:pricing`
+is a thin wrapper around that builder: it fetches the
+[models.dev](https://models.dev) catalog and upserts every priced model.
 
-Two things the catalog cannot express, added as overrides in `seed-pricing.ts`:
+The same builder writes the CLI's offline fallback (`cd ../cli && npm run pricing`)
+and the daily refresh at `GET /api/cron/refresh-pricing`. A model models.dev
+already lists is priced on the next refresh. Rates the catalog cannot express
+— Anthropic's 1-hour cache tier, and fast mode — live in `pricing/overrides.json`
+and nowhere else.
 
-- **Anthropic's 1-hour cache tier** (2× input). models.dev publishes a single
-  `cache_write`, which is the 5-minute rate. Real agent workloads are
-  overwhelmingly 1h writes, so omitting this understates every Claude Code bill.
-- **Fast mode** (Opus 5 / 4.8 at $10/$50).
+`GET /api/cli/pricing` serves the Appwrite table. When that table is empty it
+is filled before the response; when it is older than a day a refresh is
+scheduled after the response. The cron does the same rebuild at 06:15 UTC.
+Set `CRON_SECRET` in the deployment environment or the cron route returns 401.
 
-Serving pricing from the database is what lets a model released *after* a CLI
-version shipped still be priced correctly — the CLI prefers whatever it fetches
-and falls back to its built-in table only when offline.
+Until this revision is deployed, production still has whatever the last manual
+seed wrote. After deploy, one cron run (or `npm run seed:pricing` against that
+database) replaces it. This repo does not ship Appwrite credentials and does
+not call production.
 
 ## The leaderboard
 
@@ -151,6 +156,7 @@ Field names change from snake_case to camelCase (`user_id` → `userId`,
 | `APPWRITE_API_KEY` | **Server-side only.** Needs Databases read/write. |
 | `TOKN_DATABASE_ID` | `tokn` |
 | `TOKN_PUBLIC_URL` | Origin used to build profile links returned to the CLI |
+| `CRON_SECRET` | Bearer token for `GET /api/cron/refresh-pricing`. Required in production. |
 
 Locally these are read from the repo-root `.env`, which is gitignored.
 
@@ -159,7 +165,8 @@ Locally these are read from the repo-root `.env`, which is gitignored.
 | Command | What it does |
 |---|---|
 | `npm run provision` | Create anything missing. Idempotent — safe to re-run. |
-| `npm run seed:pricing` | Refresh model rates from models.dev. |
+| `npm run seed:pricing` | Refresh model rates from models.dev via `pricing/catalog.ts`. |
+| `npm test` | Catalog builder, refresh plan, and integrity pricing. |
 | `npm run verify` | 29 end-to-end checks against live Appwrite; cleans up after itself. |
 | `npm run dev` | Standalone API server on :8787. |
 | `npm run typecheck` | `tsc --noEmit`. |

@@ -20,6 +20,7 @@
     "postinstall": "node scripts/postinstall.mjs || true",
     "prepublishOnly": "npm run build",
     "pricing": "node scripts/gen-pricing.mjs src/core/pricing-data.ts",
+    "test": "tsc -p tsconfig.test.json && node --test .test-dist/test/pricing.test.js",
     "check:escapes": "node scripts/check-escapes.mjs"
   },
   "keywords": [
