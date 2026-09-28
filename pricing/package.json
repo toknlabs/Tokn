@@ -1,0 +1,6 @@
+{
+  "name": "tokn-pricing",
+  "private": true,
+  "type": "module",
+  "description": "Shared models.dev catalog builder for the CLI fallback and the Appwrite price table."
+}

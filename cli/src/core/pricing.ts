@@ -1,4 +1,4 @@
-import { CATALOG, CATALOG_GENERATED_AT } from "./pricing-data.js";
+import { CATALOG, CATALOG_GENERATED_AT, PRICING_OVERRIDES } from "./pricing-data.js";
 
 /**
  * Model pricing and cost computation.
@@ -43,18 +43,11 @@ export const DEFAULT_CACHE_READ_MULTIPLIER = 0.1;
 export { CATALOG_GENERATED_AT };
 
 /**
- * Rates that the generated catalog cannot express.
- *
- * models.dev publishes a single `cache_write` figure per model, which is the
- * 5-minute rate, so the 1-hour tier is added here. Fast mode is likewise
- * Anthropic-specific and absent from the catalog.
+ * Patches the generated catalog cannot express (1-hour cache, fast mode).
+ * Emitted from `pricing/overrides.json` by `npm run pricing`, so the CLI and
+ * the server apply the same file.
  */
-const OVERRIDES: Record<string, Partial<ModelPrice>> = {
-  "claude-opus-5": { fast: { input: 10, output: 50 } },
-  "claude-opus-4-8": { fast: { input: 10, output: 50 } },
-  // Fable 5.1 reads cache at 0.025x rather than the usual 0.1x.
-  "claude-fable-5-1": { cacheRead: 0.25 },
-};
+const OVERRIDES = PRICING_OVERRIDES;
 
 function fromCatalog(id: string): ModelPrice | undefined {
   const row = CATALOG[id];
@@ -78,6 +71,10 @@ function fromCatalog(id: string): ModelPrice | undefined {
  * `@`-versions and dated snapshots — `claude-haiku-4-5-20251001` shows up in
  * ordinary local data, and opencode records ids like `anthropic/claude-opus-5`.
  * All of those price identically to the base model.
+ *
+ * Kept in step with `normalizeModelId` in `pricing/catalog.ts`. The catalog
+ * is built with that function, and lookup uses this one; they have to agree
+ * or a prefixed log line misses a row the generator stored.
  */
 export function normalizeModel(raw: string): string {
   let id = raw.trim().toLowerCase();

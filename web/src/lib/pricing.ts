@@ -1,10 +1,10 @@
 /**
- * The pricing table the CLI downloads from `GET /api/cli/pricing`.
+ * Display helpers, plus a small Anthropic rate card used only by the local
+ * demo seed (`web/scripts/seed.ts`).
  *
- * The CLI ships an identical fallback table, but this copy is the one that
- * matters: publishing a rate here prices a new model everywhere without anyone
- * upgrading their install. Rates are USD per million tokens, matching
- * Anthropic's published first-party API pricing.
+ * This is not the table the CLI downloads. Live rates are built by
+ * `pricing/catalog.ts` and stored in Appwrite; `GET /api/cli/pricing` reads
+ * that collection. Do not add newly released models here.
  */
 
 export interface ModelPrice {

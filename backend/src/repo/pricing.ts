@@ -80,6 +80,13 @@ export async function upsertPrices(rows: PriceRow[]): Promise<number> {
 let priceCache: { at: number; table: Promise<Record<string, CliPrice>> } | null = null;
 const PRICE_TTL_MS = 60_000;
 
+/** Newest `updatedAt` seen the last time the table was loaded from Appwrite. */
+let newestUpdatedAt: string | null = null;
+
+export function pricingUpdatedAt(): string | null {
+  return newestUpdatedAt;
+}
+
 /** Every price, as the map the CLI consumes. */
 export async function pricingTable(): Promise<Record<string, CliPrice>> {
   if (priceCache && Date.now() - priceCache.at < PRICE_TTL_MS) return priceCache.table;
@@ -95,11 +102,13 @@ export async function pricingTable(): Promise<Record<string, CliPrice>> {
 /** Drop the memo. Used after a pricing refresh writes new rows. */
 export function clearPricingCache(): void {
   priceCache = null;
+  newestUpdatedAt = null;
 }
 
 async function loadPricingTable(): Promise<Record<string, CliPrice>> {
   const out: Record<string, CliPrice> = {};
   let cursor: string | undefined;
+  let newest: string | null = null;
   // 702 models at 100 a page is eight sequential round trips. Appwrite will
   // return the whole catalogue in one.
   const PAGE = 1000;
@@ -109,7 +118,7 @@ async function loadPricingTable(): Promise<Record<string, CliPrice>> {
     if (cursor) queries.push(Query.cursorAfter(cursor));
 
     const page = await db().listDocuments(DB_ID, "pricing", queries);
-    const docs = page.documents as unknown as (PriceRow & { $id: string })[];
+    const docs = page.documents as unknown as (PriceRow & { $id: string; updatedAt?: string })[];
 
     for (const row of docs) {
       const price: CliPrice = { input: row.input, output: row.output };
@@ -120,6 +129,8 @@ async function loadPricingTable(): Promise<Record<string, CliPrice>> {
         price.fast = { input: row.fastInput, output: row.fastOutput };
       }
       out[row.modelId] = price;
+      const updatedAt = row.updatedAt;
+      if (updatedAt && (newest === null || updatedAt > newest)) newest = updatedAt;
     }
 
     if (docs.length < PAGE) break;
@@ -127,6 +138,7 @@ async function loadPricingTable(): Promise<Record<string, CliPrice>> {
     if (!cursor) break;
   }
 
+  newestUpdatedAt = newest;
   return out;
 }
 

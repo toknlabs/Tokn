@@ -1,0 +1,42 @@
+{
+  "openai": {
+    "models": {
+      "sample-small": {
+        "cost": { "input": 1.25, "output": 3.5, "cache_read": 0.125, "cache_write": 1.5625 }
+      },
+      "sample-large": {
+        "cost": { "input": 4, "output": 16, "cache_read": 0.4, "cache_write": 5 }
+      },
+      "sample-free": {
+        "cost": { "input": 0, "output": 0 }
+      }
+    }
+  },
+  "openrouter": {
+    "models": {
+      "openai/sample-small": {
+        "cost": { "input": 9, "output": 9, "cache_read": 9, "cache_write": 9 }
+      },
+      "~openai/sample-latest": {
+        "cost": { "input": 1.25, "output": 3.5, "cache_read": 0.125, "cache_write": 1.5625 }
+      }
+    }
+  },
+  "amazon-bedrock": {
+    "models": {
+      "global.openai.sample-small": {
+        "cost": { "input": 1.5, "output": 4, "cache_read": 0.15, "cache_write": 1.875 }
+      }
+    }
+  },
+  "reseller-not-listed": {
+    "models": {
+      "sample-small": {
+        "cost": { "input": 99, "output": 99, "cache_read": 99, "cache_write": 99 }
+      },
+      "only-on-reseller": {
+        "cost": { "input": 3, "output": 9 }
+      }
+    }
+  }
+}

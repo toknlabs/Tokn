@@ -11,6 +11,7 @@
     "seed:pricing": "node --experimental-strip-types src/seed-pricing.ts",
     "verify": "node --experimental-strip-types src/verify.ts",
     "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test ../pricing/catalog.test.ts test/*.test.ts",
     "dev": "node --experimental-strip-types src/server.ts"
   },
   "dependencies": {
