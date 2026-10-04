@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeUrl, createState, githubEnabled, safeReturnPath } from "@/lib/backend";
+import { authorizeUrl, createState, githubEnabled, requestUrl, safeReturnPath } from "@/lib/backend";
 import { currentUser } from "@/lib/auth";
 
 /**
@@ -17,7 +17,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "GitHub sign-in is not configured" }, { status: 503 });
   }
 
-  const next = new URL(request.url).searchParams.get("next") ?? undefined;
+  // As sent: `next` can carry an app's 127.0.0.1 redirect_uri, which
+  // Next's normalised `request.url` would turn into localhost.
+  const next = requestUrl(request).searchParams.get("next") ?? undefined;
   const user = await currentUser();
 
   // Only same-origin paths, so `next` cannot be used as an open redirect.

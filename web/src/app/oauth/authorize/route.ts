@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
-import { authorizePath, authorizeRequest } from "@/lib/backend";
+import { authorizePath, authorizeRequest, requestUrl } from "@/lib/backend";
 
 /**
  * GET /oauth/authorize — where "Sign in with tokn" starts.
@@ -32,7 +32,8 @@ function found(location: string, base: string) {
 }
 
 export async function GET(request: Request) {
-  const params = new URL(request.url).searchParams;
+  // As sent: Next's `request.url` turns a 127.0.0.1 redirect_uri into localhost.
+  const params = requestUrl(request).searchParams;
   const outcome = authorizeRequest(params);
 
   if (outcome.kind === "redirect") return found(outcome.location, request.url);
