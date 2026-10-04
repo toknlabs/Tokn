@@ -2088,35 +2088,197 @@ table.t tbody tr[data-me="true"] .idle {
 /* The step rail. Deliberately not clickable: it reports where you are, and
    letting someone jump to "connect" before installing would show them a code
    for a command they do not have yet. */
+.onboard-rail {
+  margin: 0 0 2rem;
+}
 .onboard-steps {
   display: flex;
   gap: 1.5rem;
   list-style: none;
   padding: 0;
-  margin: 0 0 2rem;
+  margin: 0;
   font-size: 0.75rem;
   color: var(--sub);
+  flex-wrap: wrap;
 }
 .onboard-steps li {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  transition: color 0.3s ease;
 }
 .onboard-steps .dot {
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--sub-alt);
-  transition: background 0.2s ease;
 }
 .onboard-steps li[data-state="now"] {
   color: var(--text);
 }
+/* The step you are on: its dot springs up in the accent with one ring going out. */
 .onboard-steps li[data-state="now"] .dot {
   background: var(--main);
+  animation: onboard-dot-now 0.45s cubic-bezier(0.3, 1.5, 0.5, 1) both;
 }
+.onboard-steps li[data-state="now"] .dot::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1.5px solid var(--main);
+  animation: onboard-dot-ring 0.9s ease-out 0.1s both;
+}
+/* A finished step: the dot grows into a small disc with a check drawn in. */
 .onboard-steps li[data-state="done"] .dot {
+  width: 12px;
+  height: 12px;
+  margin: -2.5px;
   background: var(--sub);
+  animation: onboard-dot-done 0.4s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.onboard-steps .dot svg {
+  display: block;
+}
+.onboard-steps .dot path {
+  fill: none;
+  stroke: var(--bg);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 10;
+  animation: onboard-check 0.3s ease-out 0.15s both;
+}
+@keyframes onboard-dot-now {
+  from {
+    transform: scale(0.4);
+  }
+}
+@keyframes onboard-dot-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+@keyframes onboard-dot-done {
+  from {
+    transform: scale(0.6);
+  }
+}
+@keyframes onboard-check {
+  from {
+    stroke-dashoffset: 10;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* How far through the setup you are, filling as each step is done. */
+.onboard-progress {
+  height: 2px;
+  margin-top: 0.9rem;
+  border-radius: 1px;
+  background: var(--sub-alt);
+  overflow: hidden;
+}
+.onboard-progress span {
+  display: block;
+  height: 100%;
+  background: var(--main);
+  transform-origin: left;
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Each step's content comes in as a short stagger: title, then text, then the
+   rest. Keyed on the step in the component, so it replays every time. */
+.onboard-stage > * {
+  animation: onboard-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.onboard-stage > :nth-child(2) {
+  animation-delay: 0.05s;
+}
+.onboard-stage > :nth-child(3) {
+  animation-delay: 0.1s;
+}
+.onboard-stage > :nth-child(4) {
+  animation-delay: 0.15s;
+}
+.onboard-stage > :nth-child(5) {
+  animation-delay: 0.2s;
+}
+.onboard-stage > :nth-child(n + 6) {
+  animation-delay: 0.25s;
+}
+@keyframes onboard-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(3px);
+  }
+}
+
+/* The illustration cross-fades in, a touch smaller, as the step changes. */
+.onboard-art-inner {
+  animation: onboard-art-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes onboard-art-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* Which app is waiting, on the first screen of a sign-up made from one. */
+.onboard-app {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0.7rem 0.9rem;
+  background: var(--sub-alt);
+  border-radius: 10px;
+  font-size: 0.8125rem;
+  color: var(--sub);
+}
+.onboard-app img {
+  flex: none;
+  border-radius: 7px;
+}
+.onboard-app strong {
+  color: var(--text);
+  font-weight: 500;
+}
+.onboard-app .beacon {
+  flex: none;
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--main);
+  animation: onboard-beacon 2s ease-out infinite;
+}
+@keyframes onboard-beacon {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--main) 55%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--main) 0%, transparent);
+  }
+}
+.onboard-continue {
+  gap: 0.5rem;
+}
+.onboard-continue img {
+  border-radius: 4px;
 }
 
 .onboard-art {
@@ -2140,6 +2302,7 @@ table.t tbody tr[data-me="true"] .idle {
 }
 
 .onboard-code {
+  position: relative;
   display: flex;
   align-items: baseline;
   gap: 0.9rem;
@@ -2147,12 +2310,38 @@ table.t tbody tr[data-me="true"] .idle {
   padding: 0.9rem 1.1rem;
   background: var(--sub-alt);
   border-radius: 10px;
+  overflow: hidden;
 }
 .onboard-code strong {
   font-family: var(--font-mono), monospace;
   font-size: 1.35rem;
   letter-spacing: 0.12em;
   color: var(--main);
+}
+/* A fresh code rolls up into place a character at a time. */
+.onboard-code-value span {
+  display: inline-block;
+  animation: onboard-slot 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 35ms);
+}
+@keyframes onboard-slot {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+    filter: blur(2px);
+  }
+}
+/* What is left of the code's ten minutes, draining along the bottom edge. */
+.onboard-code-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--main);
+  opacity: 0.55;
+  transform-origin: left;
+  transition: transform 1s linear;
 }
 
 .onboard-waiting {
@@ -2178,6 +2367,22 @@ table.t tbody tr[data-me="true"] .idle {
   .onboard-waiting .spin {
     animation: none;
     border-top-color: var(--sub);
+  }
+  .onboard-stage > *,
+  .onboard-art-inner,
+  .onboard-code-value span,
+  .onboard-steps .dot,
+  .onboard-steps .dot::after,
+  .onboard-steps .dot path,
+  .onboard-app .beacon {
+    animation: none;
+  }
+  .onboard-steps .dot::after {
+    opacity: 0;
+  }
+  .onboard-progress span,
+  .onboard-code-bar {
+    transition: none;
   }
 }
 
@@ -2277,6 +2482,102 @@ table.t tbody tr[data-me="true"] .idle {
 .onboard-preview-handle {
   font-size: 0.875rem;
   color: var(--main);
+}
+
+/* ------------------------------------------- sign in with tokn (consent) */
+
+.consent-pair {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-bottom: 2rem;
+}
+.consent-tile {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 14px;
+  background: var(--sub-alt);
+}
+.consent-tile img {
+  border-radius: 9px;
+}
+.consent-wire {
+  position: relative;
+  width: 4.5rem;
+  height: 2px;
+  background: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--sub) 70%, transparent) 0 4px,
+    transparent 4px 9px
+  );
+}
+/* Travels from tokn to the app and fades at each end, on a slow loop. */
+.consent-packet {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--main);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--main) 60%, transparent);
+  animation: consent-packet 2.4s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@keyframes consent-packet {
+  0% {
+    left: 0;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+.consent-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 2rem;
+}
+.consent-actions .btn {
+  justify-content: center;
+  gap: 0.5rem;
+}
+.consent-actions[data-sent] .btn {
+  pointer-events: none;
+}
+.consent-actions[data-sent="approve"] .btn:not(.primary),
+.consent-actions[data-sent="deny"] .btn.primary {
+  opacity: 0.4;
+}
+.consent-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: onboard-spin 0.8s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-packet {
+    animation: none;
+    left: 50%;
+  }
+  .consent-spin {
+    animation: none;
+  }
 }
 
 /* The subscription verdict. Sized like a figure rather than a note, because it

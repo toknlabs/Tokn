@@ -194,6 +194,62 @@ export async function revokeDevice(userId: string, deviceId: string): Promise<bo
   }
 }
 
+/**
+ * Insert a device under an id the caller chose.
+ *
+ * OAuth sign-ins derive the id from the authorization code, so the second
+ * attempt to spend a code collides here. Returns false on that collision
+ * rather than throwing: it is an expected outcome, not a fault.
+ */
+export async function insertDevice(
+  deviceId: string,
+  fields: {
+    userId: string;
+    tokenHash: string;
+    hostname: string | null;
+    platform: string | null;
+    cliVersion: string | null;
+  },
+): Promise<boolean> {
+  try {
+    await db().createDocument(DB_ID, "devices", deviceId, {
+      ...fields,
+      linkedAt: new Date().toISOString(),
+      lastSyncAt: null,
+      revokedAt: null,
+    });
+    return true;
+  } catch (error) {
+    if (isConflict(error)) return false;
+    throw error;
+  }
+}
+
+/**
+ * Revoke a device with no owner check. Only for the server's own decisions —
+ * a replayed OAuth code — never for an id that arrived in a request.
+ */
+export async function revokeDeviceById(deviceId: string): Promise<void> {
+  try {
+    await db().updateDocument(DB_ID, "devices", deviceId, {
+      revokedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
+}
+
+/** Revoke whichever live device holds the token with this hash, if one does. */
+export async function revokeDeviceByTokenHash(tokenHash: string): Promise<void> {
+  const result = await db().listDocuments(DB_ID, "devices", [
+    Query.equal("tokenHash", tokenHash),
+    Query.isNull("revokedAt"),
+    Query.limit(1),
+  ]);
+  const device = result.documents[0];
+  if (device) await revokeDeviceById(device.$id);
+}
+
 export async function touchDevice(deviceId: string, cliVersion?: string): Promise<void> {
   const patch: Record<string, unknown> = { lastSyncAt: new Date().toISOString() };
   if (cliVersion) patch.cliVersion = cliVersion;

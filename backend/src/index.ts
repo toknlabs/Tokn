@@ -12,6 +12,7 @@
  *   ids.ts        deterministic row ids — the upsert invariant lives here
  *   repo/*        one module per collection
  *   service.ts    the operations a route actually performs
+ *   oauth/*       "Sign in with tokn" for desktop apps — see OAUTH.md
  */
 
 export { ENV } from "./env.ts";
@@ -41,3 +42,5 @@ export {
 } from "./refresh-pricing.ts";
 export * from "./service.ts";
 export * from "./passkey-service.ts";
+export * from "./return-path.ts";
+export * from "./oauth/index.ts";

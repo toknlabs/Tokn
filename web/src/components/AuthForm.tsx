@@ -10,10 +10,14 @@ import { useRouter } from "next/navigation";
  */
 export function AuthForm({
   next = "/account",
+  afterSignup = "/welcome",
   github = false,
   initialError = null,
 }: {
+  /** Where to go after signing in, by any method. Already checked by the page. */
   next?: string;
+  /** Where a newly created account goes. Also checked by the page. */
+  afterSignup?: string;
   /** Whether GitHub sign-in is configured on this deployment. */
   github?: boolean;
   /** A message handed back by the OAuth callback after a failed attempt. */
@@ -41,6 +45,24 @@ export function AuthForm({
    * list, so the authenticator offers whichever of its keys belongs to this
    * site and the account is resolved from the one it returns.
    */
+  /**
+   * Leave for `path`, signed in.
+   *
+   * An app's sign-in (`/oauth/…`) is a route handler that answers with a real
+   * redirect, sometimes all the way to the app's loopback on this machine, so
+   * it gets a full navigation; the client router would fetch it as a page.
+   * Everywhere else, the layout reads the session cookie server-side, so the
+   * whole tree has to re-render: a plain push would keep showing "sign in".
+   */
+  function go(path: string) {
+    if (path.startsWith("/oauth/")) {
+      window.location.assign(path);
+      return;
+    }
+    router.push(path);
+    router.refresh();
+  }
+
   async function withPasskey() {
     setBusy(true);
     setError(null);
@@ -60,8 +82,7 @@ export function AuthForm({
       const verified = await verifyResponse.json();
       if (!verifyResponse.ok) throw new Error(verified.error ?? "that passkey did not work");
 
-      router.push(next);
-      router.refresh();
+      go(next);
     } catch (problem) {
       const message = (problem as Error).message;
       // Cancelling the platform prompt is a choice, not a failure.
@@ -89,10 +110,7 @@ export function AuthForm({
         return;
       }
 
-      // The layout reads the session cookie server-side, so the whole tree has
-      // to re-render; a plain push would keep showing "Sign in".
-      router.push(mode === "signup" ? "/welcome" : next);
-      router.refresh();
+      go(mode === "signup" ? afterSignup : next);
     } catch {
       setError("could not reach the server");
     } finally {

@@ -15,6 +15,7 @@ import {
 import { refreshTotals, rankOf, getTotals } from "./repo/leaderboard.ts";
 import { assess } from "./repo/integrity.ts";
 import { listUsage, normalizeRow, summarize, upsertUsage, type SyncRow } from "./repo/usage.ts";
+import { deviceMayUpload, versionAfterSync } from "./oauth/devices.ts";
 
 /**
  * The operations behind each API route.
@@ -136,6 +137,12 @@ export async function cliSync(
   const auth = await authenticateDevice(authorization);
   if (!auth) return unlinked();
 
+  // An app signed in through OAuth uploads only if the person allowed it to.
+  // Every CLI device may. See oauth/devices.ts for where that is recorded.
+  if (!deviceMayUpload(auth.device.$id)) {
+    return fail(403, "this app was not given permission to upload usage", "Sign in again and allow uploads.");
+  }
+
   /**
    * A floor on how often one device may sync.
    *
@@ -184,7 +191,9 @@ export async function cliSync(
   await upsertUsage(auth.profile.$id, rows);
 
   const cliVersion = typeof body.cliVersion === "string" ? body.cliVersion : undefined;
-  await touchDevice(auth.device.$id, cliVersion);
+  // An app's row keeps its `<client_id>/` prefix, or the account page would
+  // stop knowing which app it is after the first sync.
+  await touchDevice(auth.device.$id, versionAfterSync(auth.device, cliVersion));
 
   // The rollup is what the leaderboard reads, so it has to be refreshed before
   // we can report a rank.

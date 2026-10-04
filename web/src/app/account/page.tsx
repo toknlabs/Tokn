@@ -13,6 +13,7 @@ import {
   revokeDevice,
 } from "@/lib/auth";
 import { CliUpdateNotice } from "@/components/CliUpdateNotice";
+import { oauthAppForDevice } from "@/lib/backend";
 import { latestCliVersion, outdatedDevices } from "@/lib/cli-version";
 import { SETUP_SEEN_COOKIE } from "@/lib/onboarding";
 import { rankOf, syncInfo } from "@/lib/stats";
@@ -28,6 +29,14 @@ async function revoke(formData: FormData) {
   const deviceId = formData.get("deviceId");
   if (typeof deviceId === "string") await revokeDevice(user.id, deviceId);
   redirect("/account");
+}
+
+/**
+ * "Eaon Desktop · ada.local". An app that did not send a device name was
+ * recorded under its own name, which would otherwise read twice.
+ */
+function appHost(name: string, hostname: string | null): string {
+  return hostname && hostname !== name ? `${name} · ${hostname}` : name;
 }
 
 async function signOut() {
@@ -58,7 +67,18 @@ export default async function AccountPage() {
   // npm, not Appwrite, and cached for six hours: this costs nothing against
   // the database budget and cannot fail the page if the registry is down.
   const latest = await latestCliVersion();
-  const stale = outdatedDevices(devices, latest);
+
+  // Apps signed in with "Sign in with tokn" are rows here too, recorded with
+  // their app's name and version. They are not the CLI, so they are labelled
+  // as the app and left out of the CLI update notice.
+  const rows = devices.map((device) => ({
+    device,
+    app: oauthAppForDevice(device.id, device.cli_version),
+  }));
+  const stale = outdatedDevices(
+    rows.filter((row) => !row.app).map((row) => row.device),
+    latest,
+  );
 
   return (
     <>
@@ -121,18 +141,24 @@ export default async function AccountPage() {
                   <tr>
                     <th>host</th>
                     <th>platform</th>
-                    <th>cli</th>
+                    <th>version</th>
                     <th>connected</th>
                     <th>last sync</th>
                     <th className="r" />
                   </tr>
                 </thead>
                 <tbody>
-                  {devices.map((device) => (
+                  {rows.map(({ device, app }) => (
                     <tr key={device.id}>
-                      <td>{device.hostname ?? "unknown"}</td>
+                      <td>
+                        {app
+                          ? appHost(app.client.name, device.hostname)
+                          : (device.hostname ?? "unknown")}
+                      </td>
                       <td className="sub">{device.platform ?? "—"}</td>
-                      <td className="sub">{device.cli_version ?? "—"}</td>
+                      <td className="sub">
+                        {(app ? app.version : device.cli_version) ?? "—"}
+                      </td>
                       <td className="sub">
                         {niceDay(device.linked_at.slice(0, 10))}
                       </td>

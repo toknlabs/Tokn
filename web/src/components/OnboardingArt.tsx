@@ -1,5 +1,9 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 /**
- * The four illustrations in the welcome flow.
+ * The illustrations in the welcome flow.
  *
  * Drawn rather than photographed, and animated in CSS rather than shipped as
  * GIFs or videos. That choice is not just about file size: these inherit the
@@ -34,22 +38,53 @@ const STYLE = `
   .art .a-text { fill: var(--text); }
   .art .a-accent { fill: var(--main); }
 
-  /* --- typing: a caret stepping along a line of characters -------------- */
-  @keyframes a-caret { 0%, 45% { opacity: 1 } 50%, 95% { opacity: 0 } 100% { opacity: 1 } }
-  /* The caret travels with the reveal rather than sitting where the text will
+  /* --- typing: a whole terminal session on one 4.2s clock ---------------- */
+  /* The command types, its output lands, the next prompt types \`tokn\`, and
+     the screen fades before the loop starts again — so the restart is never a
+     jump back to an empty line. Every part runs on the same 4.2s clock so the
+     beats stay in step; a per-keyframe steps() types one character per step.
+
+     The caret travels with the reveal rather than sitting where the text will
      eventually end. A caret that does not track what is being typed reads as a
-     rendering fault rather than as typing. Both use steps(22), one step per
-     character of the command, so they land together. */
-  .art .a-caret { animation: a-caret 1.1s steps(1) infinite, a-track 2.6s steps(22) infinite; }
-  @keyframes a-track {
-    0%       { transform: translateX(-139px) }
-    45%,100% { transform: translateX(0) }
+     rendering fault rather than as typing. */
+  .art .a-session { animation: a-session 4.2s linear infinite; }
+  @keyframes a-session { 0%, 90% { opacity: 1 } 97%, 100% { opacity: 0 } }
+
+  .art .a-typed { animation: a-type1 4.2s linear infinite; }
+  @keyframes a-type1 {
+    0%        { clip-path: inset(0 100% 0 0); animation-timing-function: steps(21, end) }
+    34%, 100% { clip-path: inset(0 0 0 0) }
   }
-  .art .a-typed { animation: a-reveal 2.6s steps(22) infinite; }
-  @keyframes a-reveal {
-    0%      { clip-path: inset(0 100% 0 0) }
-    45%,80% { clip-path: inset(0 0 0 0) }
-    100%    { clip-path: inset(0 0 0 0) }
+  .art .a-caret { animation: a-caret1 4.2s linear infinite; }
+  @keyframes a-caret1 {
+    0%        { transform: translateX(-139px); opacity: 1; animation-timing-function: steps(21, end) }
+    34%       { transform: translateX(0); opacity: 1; animation-timing-function: steps(1, end) }
+    38%       { transform: translateX(0); opacity: 0; animation-timing-function: steps(1, end) }
+    42%       { transform: translateX(0); opacity: 1; animation-timing-function: steps(1, end) }
+    46%, 100% { transform: translateX(0); opacity: 0 }
+  }
+  .art .a-out { animation: a-out 4.2s cubic-bezier(.2,.8,.3,1) infinite; }
+  @keyframes a-out {
+    0%, 44%   { opacity: 0; transform: translateY(3px) }
+    50%, 100% { opacity: 1; transform: translateY(0) }
+  }
+  .art .a-prompt2 { animation: a-prompt2 4.2s linear infinite; }
+  @keyframes a-prompt2 { 0% { opacity: 0; animation-timing-function: steps(1, end) } 54%, 100% { opacity: 1 } }
+  .art .a-typed2 { animation: a-type2 4.2s linear infinite; }
+  @keyframes a-type2 {
+    0%, 57%   { clip-path: inset(0 100% 0 0); animation-timing-function: steps(4, end) }
+    65%, 100% { clip-path: inset(0 0 0 0) }
+  }
+  .art .a-caret2 { animation: a-caret2 4.2s linear infinite; }
+  @keyframes a-caret2 {
+    0%        { transform: translateX(-27px); opacity: 0; animation-timing-function: steps(1, end) }
+    54%       { transform: translateX(-27px); opacity: 1; animation-timing-function: steps(1, end) }
+    57%       { transform: translateX(-27px); opacity: 1; animation-timing-function: steps(4, end) }
+    65%       { transform: translateX(0); opacity: 1; animation-timing-function: steps(1, end) }
+    71%       { transform: translateX(0); opacity: 0; animation-timing-function: steps(1, end) }
+    77%       { transform: translateX(0); opacity: 1; animation-timing-function: steps(1, end) }
+    83%       { transform: translateX(0); opacity: 0; animation-timing-function: steps(1, end) }
+    89%, 100% { transform: translateX(0); opacity: 1 }
   }
 
   /* --- a packet travelling down a wire ---------------------------------- */
@@ -64,9 +99,16 @@ const STYLE = `
     animation: a-travel 2.2s ease-in-out infinite;
   }
 
+  /* The confirmation brightens as the packet lands (the loop's 0%) and dims
+     while the next one is on its way, so the two read as cause and effect. */
+  .art .a-linked { animation: a-linked 2.2s ease-in-out infinite; }
+  @keyframes a-linked { 0%, 30% { opacity: 1 } 65%, 92% { opacity: .4 } 100% { opacity: 1 } }
+
   /* --- a soft pulse, for the thing that just received something --------- */
-  @keyframes a-pulse { 0%,100% { opacity: .25; r: 16 } 50% { opacity: 0; r: 30 } }
-  .art .a-pulse { animation: a-pulse 2.2s ease-out infinite; }
+  /* A thin ring going out from where the packet lands, not a filled disc: a
+     disc smeared over the corner of the window it lands on. */
+  @keyframes a-pulse { 0% { opacity: .85; r: 4 } 55%, 100% { opacity: 0; r: 22 } }
+  .art .a-pulse { fill: none; stroke: var(--main); stroke-width: 1.5; animation: a-pulse 2.2s ease-out infinite; }
 
   /* --- the mark drawing itself, for the welcome screen ------------------ */
   /* Plays once and holds rather than looping. This is the first thing a new
@@ -122,6 +164,27 @@ const STYLE = `
     74%, 100% { opacity: 0;  r: 54 }
   }
 
+  /* --- the moment a machine connects ------------------------------------ */
+  /* A disc that springs to size, a check drawn into it, and one ring going
+     out. Animated through \`r\` and stroke offsets, never a scale, for the
+     transform-box reason in the header. Plays once. */
+  .art .a-ok-disc { fill: var(--main); animation: a-ok-pop .55s cubic-bezier(.3,1.4,.5,1) both; }
+  @keyframes a-ok-pop { 0% { r: 0 } 70% { r: 33 } 100% { r: 30 } }
+  .art .a-ok-check {
+    fill: none;
+    stroke: var(--bg);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 42;
+    animation: a-ok-draw .42s cubic-bezier(.3,.7,.3,1) .3s both;
+  }
+  @keyframes a-ok-draw { from { stroke-dashoffset: 42 } to { stroke-dashoffset: 0 } }
+  .art .a-ok-ring { fill: none; stroke: var(--main); stroke-width: 2; animation: a-ok-ring 1.1s ease-out .25s both; }
+  @keyframes a-ok-ring { from { r: 30; opacity: .55 } to { r: 64; opacity: 0 } }
+  .art .a-ok-text { animation: a-ok-text .5s ease-out .55s both; }
+  @keyframes a-ok-text { from { opacity: 0; transform: translateY(4px) } }
+
   /* --- bars growing, for the payoff screen ------------------------------ */
   @keyframes a-grow {
     from { clip-path: inset(100% 0 0 0) }
@@ -132,11 +195,15 @@ const STYLE = `
   @media (prefers-reduced-motion: reduce) {
     .art .a-caret, .art .a-typed, .art .a-packet, .art .a-pulse, .art .a-bar,
     .art .a-shackle, .art .a-unlock-ring,
-    .art .a-mark, .art .a-core, .art .a-halo {
+    .art .a-mark, .art .a-core, .art .a-halo,
+    .art .a-session, .art .a-out, .art .a-prompt2, .art .a-typed2, .art .a-caret2,
+    .art .a-linked, .art .a-ok-disc, .art .a-ok-check, .art .a-ok-ring, .art .a-ok-text {
       animation: none;
     }
-    .art .a-caret { transform: translateX(0); opacity: 1; }
-    .art .a-typed { clip-path: none; }
+    .art .a-caret { transform: translateX(0); opacity: 0; }
+    .art .a-caret2 { transform: translateX(0); opacity: 1; }
+    .art .a-typed, .art .a-typed2 { clip-path: none; }
+    .art .a-ok-ring, .art .a-pulse { opacity: 0; }
     .art .a-packet { offset-distance: 100%; opacity: 1; }
     .art .a-bar { clip-path: inset(0 0 0 0); }
     .art .a-shackle { transform: translateY(-14px); }
@@ -202,7 +269,7 @@ export function ArtInstall() {
   return (
     <Frame>
       <Window title="terminal">
-        <g fontFamily="monospace" fontSize="11">
+        <g fontFamily="monospace" fontSize="11" className="a-session">
           <text x="44" y="78" className="a-accent">
             $
           </text>
@@ -211,16 +278,19 @@ export function ArtInstall() {
               npm install -g toknhq
             </text>
           </g>
-          <rect className="a-accent a-caret" x="196" y="69" width="6" height="12" rx="1" />
-          <text x="44" y="100" className="a-dim" fontSize="10">
+          <rect className="a-accent a-caret" x="197" y="69" width="6" height="12" rx="1" />
+          <text x="44" y="100" className="a-dim a-out" fontSize="10">
             added 1 package in 2s
           </text>
-          <text x="44" y="122" className="a-accent">
+          <text x="44" y="122" className="a-accent a-prompt2">
             $
           </text>
-          <text x="58" y="122" className="a-dim" fontSize="11">
-            tokn
-          </text>
+          <g className="a-typed2">
+            <text x="58" y="122" className="a-text" fontSize="11">
+              tokn
+            </text>
+          </g>
+          <rect className="a-accent a-caret2" x="85" y="113" width="6" height="12" rx="1" />
         </g>
       </Window>
     </Frame>
@@ -254,7 +324,7 @@ export function ArtLink() {
       <rect x="150" y="30" width="146" height="18" rx="8" fill="var(--sub-alt)" opacity="0.6" />
       {/* On the wire's landing point, not over the text it would otherwise sit
           on top of and make unreadable. */}
-      <circle className="a-accent a-pulse" cx="160" cy="60" r="16" />
+      <circle className="a-pulse" cx="160" cy="60" r="16" />
       <g fontFamily="monospace" fontSize="10">
         <text x="174" y="74" className="a-accent">
           $
@@ -262,7 +332,7 @@ export function ArtLink() {
         <text x="186" y="74" className="a-text">
           tokn link
         </text>
-        <text x="174" y="94" className="a-dim">
+        <text x="174" y="94" className="a-accent a-linked">
           ✓ linked
         </text>
       </g>
@@ -307,9 +377,56 @@ export function ArtSecure() {
   );
 }
 
+/** The moment a machine connects: a check springing in, with one ring going out. */
+export function ArtLinked() {
+  return (
+    <Frame>
+      <circle className="a-ok-ring" cx="160" cy="84" r="30" />
+      <circle className="a-ok-disc" cx="160" cy="84" r="30" />
+      <path className="a-ok-check" d="M 146 85 l 9.5 9.5 l 19 -21" />
+      <text
+        x="160"
+        y="146"
+        className="a-dim a-ok-text"
+        fontSize="10"
+        fontFamily="monospace"
+        textAnchor="middle"
+      >
+        linked
+      </text>
+    </Frame>
+  );
+}
+
+/**
+ * A number counting up to `to` over `ms`, on the same ease as the bars beside
+ * it. Shows the final value straight away under reduced motion and on the
+ * server.
+ */
+function useCountUp(to: number, ms: number, delay = 0): number {
+  const [value, setValue] = useState(() =>
+    typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches ? to : 0,
+  );
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let frame = 0;
+    const start = performance.now() + delay;
+    const tick = (now: number) => {
+      const t = Math.min(1, Math.max(0, (now - start) / ms));
+      // easeOutCubic, close to the bars' cubic-bezier(.2,.8,.3,1).
+      setValue(Math.round(to * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [to, ms, delay]);
+  return value;
+}
+
 /** Step 4 — the payoff: your usage, drawn. */
 export function ArtDone() {
   const bars = [34, 52, 28, 70, 46, 88, 62, 96];
+  const total = useCountUp(10669, 1300, 120);
   return (
     <Frame>
       <rect className="a-bg" x="24" y="26" width="272" height="128" rx="10" />
@@ -317,7 +434,7 @@ export function ArtDone() {
         your usage
       </text>
       <text x="44" y="72" className="a-text" fontSize="16" fontFamily="monospace">
-        $10,669
+        ${total.toLocaleString("en-US")}
       </text>
       {bars.map((h, i) => (
         <rect
