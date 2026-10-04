@@ -12,6 +12,7 @@ import {
   ArtWelcome,
   ArtInstall,
   ArtLink,
+  ArtLinked,
   ArtSecure,
   ArtDone,
 } from "@/components/OnboardingArt";
@@ -37,6 +38,15 @@ import {
  * a separate and quieter control.
  *
  * Every step can be left. A tutorial that traps someone is worse than none.
+ *
+ * When the account was made in the middle of an app's sign-in (`returnTo` is
+ * that app's `/oauth/authorize`), the flow names the app, and every way out of
+ * it — finishing, or skipping — goes back there to approve it.
+ *
+ * Motion: each step's content comes in as a short stagger and the
+ * illustration cross-fades, keyed on the step so it replays; the rail fills as
+ * the steps are done; a machine connecting gets a moment of its own before the
+ * flow moves on. All of it stands still under prefers-reduced-motion.
  */
 
 type Step = "welcome" | "profile" | "install" | "link" | "secure" | "done";
@@ -56,6 +66,15 @@ const STEPS: { key: Step; label: string }[] = [
 
 const MAX_NAME = 60;
 
+/** How long a link code lives (`CODE_TTL_MINUTES` in backend/src/repo/devices.ts), for the expiry bar. */
+const CODE_TTL_MS = 10 * 60_000;
+
+/** How long "connected" stays on screen before the flow moves on. */
+const LINKED_PAUSE_MS = 1400;
+
+const reducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function Onboarding({
   handle: initialHandle,
   initialName,
@@ -66,6 +85,8 @@ export function Onboarding({
   initialExpiry,
   alreadyLinked,
   hasPasskey,
+  returnTo = null,
+  app = null,
 }: {
   handle: string;
   initialName: string | null;
@@ -78,6 +99,10 @@ export function Onboarding({
   /** True when a machine connected before they reached this page. */
   alreadyLinked: boolean;
   hasPasskey: boolean;
+  /** Where the account was headed when it signed up. Already checked by the page. */
+  returnTo?: string | null;
+  /** The app waiting at `returnTo`, when it is an app's sign-in. */
+  app?: { name: string; icon: string } | null;
 }) {
   const router = useRouter();
   const [step, setStep] = useState<Step>("welcome");
@@ -87,8 +112,12 @@ export function Onboarding({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [passkeyAdded, setPasskeyAdded] = useState(hasPasskey);
+  /** The machine just connected: "connected" holds the screen for a moment. */
+  const [justLinked, setJustLinked] = useState(false);
 
   const index = STEPS.findIndex((s) => s.key === step);
+  /** Where "later" and the last step lead. */
+  const leave = returnTo ?? "/account";
 
   // Mark the browser the moment the flow opens, not when it is completed.
   // Someone who is shown this and closes the tab has been offered it, and
@@ -203,8 +232,15 @@ export function Onboarding({
 
         if (data.status === "linked") {
           setLinked(true);
-          setStep("secure");
+          setJustLinked(true);
           router.refresh();
+          window.setTimeout(
+            () => {
+              setJustLinked(false);
+              setStep("secure");
+            },
+            reducedMotion() ? 500 : LINKED_PAUSE_MS,
+          );
         } else if (data.status === "expired") {
           await refreshCode();
         }
@@ -259,48 +295,77 @@ export function Onboarding({
   return (
     <div style={{ maxWidth: "34rem", margin: "2.5rem auto 0", width: "100%" }}>
       {step !== "welcome" && (
-        <ol className="onboard-steps" aria-label="setup progress">
-          {STEPS.map((s, i) => (
-            <li key={s.key} data-state={i < index ? "done" : i === index ? "now" : "todo"}>
-              <span className="dot" aria-hidden="true" />
-              {s.label}
-            </li>
-          ))}
-        </ol>
+        <div className="onboard-rail">
+          <ol className="onboard-steps" aria-label="setup progress">
+            {STEPS.map((s, i) => {
+              const state = i < index ? "done" : i === index ? "now" : "todo";
+              return (
+                // Keyed on the state too, so a dot's change of state replays its animation.
+                <li key={`${s.key}-${state}`} data-state={state} aria-current={state === "now" ? "step" : undefined}>
+                  <span className="dot" aria-hidden="true">
+                    {state === "done" && (
+                      <svg viewBox="0 0 12 12" width="12" height="12">
+                        <path d="M3 6.2 5.1 8.3 9 4" />
+                      </svg>
+                    )}
+                  </span>
+                  {s.label}
+                </li>
+              );
+            })}
+          </ol>
+          <div className="onboard-progress" aria-hidden="true">
+            <span style={{ transform: `scaleX(${Math.max(0, index) / (STEPS.length - 1)})` }} />
+          </div>
+        </div>
       )}
 
       <div className="onboard-art">
-        {step === "welcome" && <ArtWelcome />}
-        {step === "profile" && (
-          <ProfilePreview handle={handle} name={name} avatar={avatar} avatarUrl={avatarUrl} />
-        )}
-        {step === "install" && <ArtInstall />}
-        {step === "link" && <ArtLink />}
-        {step === "secure" && <ArtSecure />}
-        {step === "done" && <ArtDone />}
+        {/* Keyed on what it shows, so each illustration fades in fresh. */}
+        <div className="onboard-art-inner" key={justLinked ? "linked" : step}>
+          {step === "welcome" && <ArtWelcome />}
+          {step === "profile" && (
+            <ProfilePreview handle={handle} name={name} avatar={avatar} avatarUrl={avatarUrl} />
+          )}
+          {step === "install" && <ArtInstall />}
+          {step === "link" && (justLinked ? <ArtLinked /> : <ArtLink />)}
+          {step === "secure" && <ArtSecure />}
+          {step === "done" && <ArtDone />}
+        </div>
       </div>
 
       {step === "welcome" && (
-        <section>
+        <section className="onboard-stage" key="welcome">
           <h1 className="title">welcome to tokn</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
             it reads what your AI coding tools already write to disk and turns it
             into a picture of what you actually spend. setting up takes about two
             minutes.
           </p>
+          {app && (
+            <div className="onboard-app">
+              <img src={app.icon} alt="" width={28} height={28} />
+              <span>
+                <strong>{app.name}</strong> is waiting to connect. set up first, then
+                you will approve it and head straight back.
+              </span>
+              <span className="beacon" aria-hidden="true" />
+            </div>
+          )}
           <div className="onboard-actions">
             <button type="button" className="btn primary" onClick={() => setStep("profile")}>
               get started
             </button>
-            <Link href="/account" className="micro link">
-              I will do this later
-            </Link>
+            {/* A full navigation: an app's sign-in is a route that redirects. */}
+            <a href={leave} className="micro link">
+              {app ? `skip setup and connect ${app.name}` : "I will do this later"}
+            </a>
           </div>
         </section>
       )}
 
       {step === "profile" && (
-        <section>
+        <section className="onboard-stage" key="profile">
           <h1 className="title">who are you</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
             your handle is how people find you. the display name is what appears
@@ -389,7 +454,7 @@ export function Onboarding({
       )}
 
       {step === "install" && (
-        <section>
+        <section className="onboard-stage" key="install">
           <h1 className="title">install the cli</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
             it reads the session logs your AI tools already write to disk. nothing is
@@ -401,6 +466,8 @@ export function Onboarding({
           <p className="micro" style={{ marginTop: "1rem" }}>
             needs node 22.5 or newer. the command it installs is{" "}
             <span className="kbd">tokn</span>.
+            {app &&
+              ` ${app.name} reports its own usage; the cli adds Claude Code, Codex, Copilot CLI and opencode on this machine.`}
           </p>
           <div className="onboard-actions">
             <button type="button" className="btn primary" onClick={() => setStep("link")}>
@@ -416,8 +483,17 @@ export function Onboarding({
         </section>
       )}
 
-      {step === "link" && (
-        <section>
+      {step === "link" && justLinked && (
+        <section className="onboard-stage" key="linked" aria-live="polite">
+          <h1 className="title">connected</h1>
+          <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
+            this machine is linked to @{handle}. one more thing, then you are done.
+          </p>
+        </section>
+      )}
+
+      {step === "link" && !justLinked && (
+        <section className="onboard-stage" key="link">
           <h1 className="title">connect this machine</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
             run this, and paste the code when it asks.
@@ -429,7 +505,14 @@ export function Onboarding({
 
           <div className="onboard-code" aria-live="polite">
             <span className="micro">your code</span>
-            <strong>{code}</strong>
+            {/* Keyed on the code, so a fresh one rolls in character by character. */}
+            <strong key={code} className="onboard-code-value" aria-label={code}>
+              {[...code].map((char, i) => (
+                <span key={i} aria-hidden="true" style={{ ["--i" as string]: i }}>
+                  {char}
+                </span>
+              ))}
+            </strong>
             <span className="micro">
               {remaining === null
                 ? " "
@@ -437,6 +520,11 @@ export function Onboarding({
                   ? `expires in ${clock(remaining)}`
                   : "expired — fetching a new one"}
             </span>
+            <span
+              className="onboard-code-bar"
+              aria-hidden="true"
+              style={{ transform: `scaleX(${remaining === null ? 1 : Math.min(1, remaining / CODE_TTL_MS)})` }}
+            />
           </div>
 
           {error && (
@@ -462,8 +550,8 @@ export function Onboarding({
       )}
 
       {step === "secure" && (
-        <section>
-          <h1 className="title">{linked ? "connected" : "secure your account"}</h1>
+        <section className="onboard-stage" key="secure">
+          <h1 className="title">secure your account</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
             {linked
               ? "your machine is linked. one more thing worth thirty seconds: "
@@ -521,12 +609,14 @@ export function Onboarding({
       )}
 
       {step === "done" && (
-        <section>
+        <section className="onboard-stage" key="done">
           <h1 className="title">you are set up</h1>
           <p className="lede" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
-            {linked
-              ? "run tokn sync whenever you want to publish, or let it run in the background."
-              : "install and link whenever you are ready — the steps are on the connect page."}
+            {app
+              ? `one last step: approve ${app.name}, and its usage joins yours here.`
+              : linked
+                ? "run tokn sync whenever you want to publish, or let it run in the background."
+                : "install and link whenever you are ready — the steps are on the connect page."}
           </p>
 
           <div style={{ marginTop: "1.5rem" }}>
@@ -534,12 +624,27 @@ export function Onboarding({
           </div>
 
           <div className="onboard-actions">
-            <Link href="/account" className="btn primary">
-              go to your usage
-            </Link>
-            <Link href={`/profile/${handle}`} className="btn">
-              see your profile
-            </Link>
+            {app ? (
+              <>
+                {/* A full navigation: an app's sign-in is a route that redirects. */}
+                <a href={leave} className="btn primary onboard-continue">
+                  <img src={app.icon} alt="" width={16} height={16} />
+                  continue to {app.name}
+                </a>
+                <Link href="/account" className="btn">
+                  go to your usage
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/account" className="btn primary">
+                  go to your usage
+                </Link>
+                <Link href={`/profile/${handle}`} className="btn">
+                  see your profile
+                </Link>
+              </>
+            )}
           </div>
         </section>
       )}

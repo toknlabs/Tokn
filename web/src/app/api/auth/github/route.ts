@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authorizeUrl, createState, githubEnabled } from "@/lib/backend";
+import { authorizeUrl, createState, githubEnabled, safeReturnPath } from "@/lib/backend";
 import { currentUser } from "@/lib/auth";
 
 /**
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   const user = await currentUser();
 
   // Only same-origin paths, so `next` cannot be used as an open redirect.
-  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : undefined;
+  const safeNext = safeReturnPath(next) ?? undefined;
 
   const state = createState({ link: user?.id, next: safeNext });
   return NextResponse.redirect(authorizeUrl(state));

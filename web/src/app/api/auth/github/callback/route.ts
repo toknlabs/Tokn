@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { exchangeCode, GithubError, signInWithGithub, verifyState } from "@/lib/backend";
+import {
+  exchangeCode,
+  GithubError,
+  safeReturnPath,
+  signInWithGithub,
+  verifyState,
+} from "@/lib/backend";
 import { createSession, setSessionCookie } from "@/lib/auth";
 import { profilesChanged } from "@/lib/board-cache";
 
@@ -54,10 +60,19 @@ export async function GET(request: Request) {
     await setSessionCookie(session.id, session.expiresAt);
   }
 
+  // `next` was checked before it was signed into the state; checked again here
+  // so this redirect does not depend on every caller of createState having done so.
   const origin = new URL(request.url).origin;
+  // A new account gets the welcome flow first, carrying where it was headed,
+  // like an email sign-up does.
+  const next = safeReturnPath(state.next);
   const destination = state.link
     ? "/settings?github=connected"
-    : (state.next ?? (result.created ? "/settings?welcome=1" : "/account"));
+    : result.created
+      ? next
+        ? `/welcome?next=${encodeURIComponent(next)}`
+        : "/welcome"
+      : (next ?? "/account");
 
   return NextResponse.redirect(new URL(destination, origin));
 }
