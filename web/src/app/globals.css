@@ -1627,77 +1627,6 @@ table.t tbody tr[data-me="true"] .idle {
   color: var(--sub);
 }
 
-/*
- * The top of a profile: identity, then a meta line tucked under it. One
- * section, so the page's 3rem rhythm falls between the person and their
- * numbers rather than between their name and their links.
- */
-.profile-top {
-  display: flex;
-  flex-direction: column;
-  gap: 1.1rem;
-}
-
-.profile-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1.5rem;
-  font-size: 0.75rem;
-}
-
-/* Square with soft corners, as an app icon is: a profile is a thing you
-   open, where a round avatar in a table row is a person you pass. */
-.profile-avatar .avatar {
-  border-radius: 12px;
-}
-
-.trend-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.trend-head .micro {
-  margin-top: 0.15rem;
-}
-
-/* Facts beside the top models on a wide screen, stacked on a narrow one. */
-.facts-wrap {
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 2rem 3.5rem;
-  align-items: start;
-}
-
-.facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
-  gap: 1.1rem 1.5rem;
-  margin: 0;
-}
-
-.facts dt {
-  font-size: 0.6875rem;
-  color: var(--sub);
-}
-
-.facts dd {
-  margin: 0.2rem 0 0;
-  font-size: 0.9375rem;
-  letter-spacing: -0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.spark {
-  display: inline-block;
-  vertical-align: middle;
-}
-
 /* --------------------------------------------------------------- heatmap */
 
 .heat {
@@ -1758,38 +1687,6 @@ table.t tbody tr[data-me="true"] .idle {
 
 .dot[data-level="4"] {
   background: var(--main);
-}
-
-.heat.round .heat-months,
-.heat.round .heat-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--weeks, 53), minmax(0, 1fr));
-  gap: 3px;
-}
-
-.heat.round .heat-months span {
-  white-space: nowrap;
-  text-align: center;
-}
-
-.heat.round .heat-col,
-.heat.round .heat-days {
-  grid-template-rows: repeat(7, 12px);
-  gap: 4px;
-}
-
-.heat.round .heat-days {
-  line-height: 12px;
-}
-
-.heat.round .heat-col {
-  justify-items: center;
-}
-
-.heat.round .dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
 }
 
 /* -------------------------------------------------------------- terminal */
@@ -1890,12 +1787,6 @@ table.t tbody tr[data-me="true"] .idle {
 
   .navlinks::-webkit-scrollbar {
     display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .facts-wrap {
-    grid-template-columns: 1fr;
   }
 }
 

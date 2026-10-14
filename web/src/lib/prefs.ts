@@ -82,8 +82,6 @@ export const STATS = [
   "perRequest",
   "biggestDay",
   "planRoi",
-  "agents",
-  "longestAgent",
 ] as const;
 
 export type StatKey = (typeof STATS)[number];
@@ -101,16 +99,7 @@ export const STAT_LABELS: Record<StatKey, string> = {
   perRequest: "per request",
   biggestDay: "biggest day",
   planRoi: "plan return",
-  agents: "agents",
-  longestAgent: "longest agent",
 };
-
-/**
- * The headline row for anyone with agent runs who has not picked their own,
- * and always on the Eaon profile: what an agent app has that a token count
- * does not.
- */
-export const AGENT_STATS: StatKey[] = ["longestAgent", "agents", "longestStreak", "streak"];
 
 /** The headline row is four wide; more would wrap and stop being a headline. */
 export const STAT_SLOTS = 4;
@@ -199,33 +188,6 @@ function padStats(chosen: StatKey[]): StatKey[] {
     if (!out.includes(key)) out.push(key);
   }
   return out;
-}
-
-/** Whether the stored blob picks its own headline figures. */
-export function hasOwnStats(stored: string | null | undefined): boolean {
-  if (!stored) return false;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    return (
-      typeof parsed === "object" &&
-      parsed !== null &&
-      Array.isArray((parsed as Record<string, unknown>).stats)
-    );
-  } catch {
-    return false;
-  }
-}
-
-/** Whether the stored blob picks its own accent. */
-export function hasOwnAccent(stored: string | null | undefined): boolean {
-  if (!stored) return false;
-  try {
-    const parsed: unknown = JSON.parse(stored);
-    const accent = (parsed as Record<string, unknown> | null)?.accent;
-    return typeof accent === "string" && (ACCENTS as readonly string[]).includes(accent);
-  } catch {
-    return false;
-  }
 }
 
 /** Serialise for storage, or null when the user is on every default. */

@@ -49,9 +49,7 @@ export function Ticker({
     setShown(0);
 
     const step = (now: number) => {
-      // A frame's timestamp is when the frame began, which can be a moment
-      // before `start`; below zero the ease-out goes negative ("-6.5M").
-      const t = Math.min(1, Math.max(0, (now - start) / duration));
+      const t = Math.min(1, (now - start) / duration);
       // Strong ease-out: most of the distance is covered immediately, so the
       // number reads as settling rather than as a slot machine.
       const eased = 1 - Math.pow(1 - t, 4);

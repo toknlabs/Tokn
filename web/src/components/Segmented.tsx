@@ -11,15 +11,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
  * from the live DOM so it stays correct as labels or fonts change.
  *
  * Options are links, not buttons: the leaderboard's filter state lives in the
- * URL, so every view stays shareable and the back button works. Given
- * `onSelect` instead, they are buttons, for a choice that only changes what
- * one chart draws and is not worth a round trip.
+ * URL, so every view stays shareable and the back button works.
  */
 
 export interface SegmentOption<T extends string> {
   key: T;
   label: string;
-  href?: string;
+  href: string;
 }
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -28,12 +26,10 @@ export function Segmented<T extends string>({
   options,
   active,
   ariaLabel,
-  onSelect,
 }: {
   options: SegmentOption<T>[];
   active: T;
   ariaLabel: string;
-  onSelect?: (key: T) => void;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<{ x: number; w: number } | null>(null);
@@ -66,31 +62,18 @@ export function Segmented<T extends string>({
         />
       )}
 
-      {options.map((option) =>
-        onSelect || option.href === undefined ? (
-          <button
-            key={option.key}
-            type="button"
-            className="seg"
-            data-active={option.key === active}
-            aria-pressed={option.key === active}
-            onClick={() => onSelect?.(option.key)}
-          >
-            {option.label}
-          </button>
-        ) : (
-          <Link
-            key={option.key}
-            href={option.href}
-            className="seg"
-            data-active={option.key === active}
-            aria-current={option.key === active ? "true" : undefined}
-            scroll={false}
-          >
-            {option.label}
-          </Link>
-        ),
-      )}
+      {options.map((option) => (
+        <Link
+          key={option.key}
+          href={option.href}
+          className="seg"
+          data-active={option.key === active}
+          aria-current={option.key === active ? "true" : undefined}
+          scroll={false}
+        >
+          {option.label}
+        </Link>
+      ))}
     </div>
   );
 }
