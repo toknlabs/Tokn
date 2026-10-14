@@ -276,7 +276,9 @@ export default async function EaonProfilePage({
               )}
               <div className="e-record">
                 <span className="e-k">longest streak</span>
-                <span className="e-record-v">{count(stats.longestStreak)} days</span>
+                <span className="e-record-v">
+                  {count(stats.longestStreak)} {stats.longestStreak === 1 ? "day" : "days"}
+                </span>
               </div>
             </div>
           </section>

@@ -241,11 +241,12 @@ export default async function EaonIndexPage({
 
 function recordValue(record: IndexRecord): string {
   const n = Number(record.value);
+  const of = (one: string, many: string) => `${count(n)} ${n === 1 ? one : many}`;
   if (record.label === "biggest day") return `${compact(n)} tokens`;
   if (record.label === "longest agent run") return duration(n);
-  if (record.label === "longest streak") return `${count(n)} days`;
-  if (record.label === "most agents in a day") return `${count(n)} runs`;
-  return `${count(n)} models`;
+  if (record.label === "longest streak") return of("day", "days");
+  if (record.label === "most agents in a day") return of("run", "runs");
+  return of("model", "models");
 }
 
 function RecordCard({ record, profile }: { record: IndexRecord; profile: (handle: string) => string }) {
