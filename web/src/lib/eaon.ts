@@ -29,7 +29,7 @@ export const INDEX_PERIODS: { key: IndexPeriod; label: string; days: number | nu
   { key: "7d", label: "7d", days: 7 },
   { key: "30d", label: "30d", days: 30 },
   { key: "90d", label: "90d", days: 90 },
-  { key: "all", label: "all", days: null },
+  { key: "all", label: "All", days: null },
 ];
 
 export const isIndexPeriod = (value: string | undefined): value is IndexPeriod =>
@@ -38,11 +38,11 @@ export const isIndexPeriod = (value: string | undefined): value is IndexPeriod =
 export type IndexSort = "tokens" | "agents" | "time" | "streak" | "cache";
 
 export const INDEX_SORTS: { key: IndexSort; label: string }[] = [
-  { key: "tokens", label: "tokens" },
-  { key: "agents", label: "agents" },
-  { key: "time", label: "agent time" },
-  { key: "streak", label: "streak" },
-  { key: "cache", label: "cache hit" },
+  { key: "tokens", label: "Tokens" },
+  { key: "agents", label: "Agents" },
+  { key: "time", label: "Agent time" },
+  { key: "streak", label: "Streak" },
+  { key: "cache", label: "Cache hit" },
 ];
 
 export const isIndexSort = (value: string | undefined): value is IndexSort =>

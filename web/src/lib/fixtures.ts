@@ -11,7 +11,8 @@ import {
 /**
  * Placeholder data for looking at pages without a database. Development only.
  *
- * Start the dev server with `TOKN_FIXTURES=1` and the board, the profiles and
+ * Start the dev server with `TOKN_FIXTURES=1` (or `sparse`, for one person and
+ * a few days) and the board, the profiles and
  * the Eaon pages render from a fixed cast of made-up accounts instead of
  * Appwrite. Nothing here is a real person, and nothing here is ever written
  * anywhere.
@@ -21,7 +22,7 @@ import {
  * its environment says.
  */
 export function fixturesOn(): boolean {
-  return process.env.NODE_ENV !== "production" && process.env.TOKN_FIXTURES === "1";
+  return process.env.NODE_ENV !== "production" && (process.env.TOKN_FIXTURES === "1" || process.env.TOKN_FIXTURES === "sparse");
 }
 
 interface Person {
@@ -173,7 +174,11 @@ function build(): Built {
   const usage: UsageDoc[] = [];
   const agents: AgentDoc[] = [];
 
-  for (const person of CAST) {
+  // `TOKN_FIXTURES=sparse`: one person and a few days, as a new site looks.
+  const sparse = process.env.TOKN_FIXTURES === "sparse";
+  const cast = sparse ? [{ ...CAST[0]!, joinedDaysAgo: 9, activity: 0.35, idleFor: 4 }] : CAST;
+
+  for (const person of cast) {
     const userId = idOf(person.handle);
     const rand = random(person.handle);
 
@@ -247,7 +252,7 @@ function build(): Built {
         });
       }
 
-      if (person.eaon > 0) {
+      if (person.eaon > 0 && !sparse) {
         const runs = 1 + Math.floor(rand() * 9 * ramp);
         const longestMs = Math.round((3 + rand() * rand() * 140) * 60_000);
         const totalMs = Math.round(longestMs + (runs - 1) * longestMs * (0.15 + rand() * 0.5));

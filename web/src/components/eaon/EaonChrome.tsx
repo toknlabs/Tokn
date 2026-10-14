@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 /**
- * The frame around every page on tokns.eaon.dev. It is Eaon's, not tokn's:
- * Eaon's mark and blue, its own header and footer, always dark. tokn shows up
- * only as where the numbers come from and where to sign in.
+ * The frame around every page on tokns.eaon.dev: Eaon's mark, a quiet
+ * header and footer, always dark. Tokn shows up only as where the numbers
+ * come from and where to sign in.
  */
 
 /** Eaon's mark (resources/brand/eaon-symbol.svg in Eaon Desktop). */
@@ -23,22 +23,17 @@ export function EaonHeader({ toknUrl, boardHref }: { toknUrl: string; boardHref:
   return (
     <header className="e-header">
       <div className="e-wrap e-header-inner">
-        <Link href={boardHref} className="e-brand" aria-label="Eaon usage index, home">
-          <EaonSymbol />
-          <span className="e-brand-name">Eaon</span>
-          <span className="e-brand-tag">tokns</span>
+        <Link href={boardHref} className="e-brand" aria-label="Eaon Desktop leaderboard, home">
+          <EaonSymbol size={20} />
+          <span>Eaon</span>
+          <span className="e-brand-sub">Leaderboard</span>
         </Link>
-        <nav className="e-nav" aria-label="sections">
-          <Link href={`${boardHref}#overview`}>index</Link>
-          <Link href={`${boardHref}#records`}>records</Link>
-          <Link href={`${boardHref}#board`}>board</Link>
-          <a href="https://eaon.dev" className="e-nav-out">
-            get Eaon
+        <nav className="e-nav" aria-label="Sections">
+          <a href="https://eaon.dev">Download Eaon</a>
+          <a href={`${toknUrl}/account/eaon`} className="e-nav-signin">
+            Sign in
           </a>
         </nav>
-        <a href={`${toknUrl}/account/eaon`} className="e-signin">
-          Sign in with Tokn
-        </a>
       </div>
     </header>
   );
@@ -49,19 +44,15 @@ export function EaonFooter({ toknUrl }: { toknUrl: string }) {
     <footer className="e-footer">
       <div className="e-wrap e-footer-inner">
         <span className="e-footer-brand">
-          <EaonSymbol size={14} /> Eaon Desktop usage index
+          <EaonSymbol size={14} /> Eaon
         </span>
-        <span className="e-dim">
-          Counted on each computer by Eaon Desktop and synced through{" "}
-          <a href={toknUrl} className="e-link">
-            Tokn
-          </a>
-          . Daily totals only, never prompts or code.
+        <span>
+          Usage is counted on each computer by Eaon Desktop and synced through{" "}
+          <a href={toknUrl}>Tokn</a>: daily totals only, never prompts or code.
         </span>
-        <nav className="e-footer-links">
-          <a href={`${toknUrl}/privacy`}>privacy</a>
-          <a href={`${toknUrl}/terms`}>terms</a>
-          <a href={`${toknUrl}/about`}>about tokn</a>
+        <nav className="e-footer-links" aria-label="Legal">
+          <a href={`${toknUrl}/privacy`}>Privacy</a>
+          <a href={`${toknUrl}/terms`}>Terms</a>
         </nav>
       </div>
     </footer>
