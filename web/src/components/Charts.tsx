@@ -30,17 +30,30 @@ export function AreaChart({
   points,
   format,
   height = 170,
+  fill = "fade",
+  fixed = false,
 }: {
   points: SeriesPoint[];
   format: (value: number) => string;
   height?: number;
+  /**
+   * `fade` dies out before the baseline; `solid` is a flat, dark wash of the
+   * accent under a thin line — the profile's tokens chart, where the shape is
+   * read as an area rather than as a line.
+   */
+  fill?: "fade" | "solid";
+  /**
+   * Hold `height` in pixels at every width. Scaled by width instead, a wide
+   * chart turns into a ribbon on a phone.
+   */
+  fixed?: boolean;
 }) {
   if (points.length < 2) return <p className="empty">not enough data yet</p>;
 
   const W = 1000;
   const pad = 6;
   const max = Math.max(...points.map((point) => point.value)) || 1;
-  const fillId = `fade-${points.length}-${Math.round(max)}`;
+  const fillId = `${fill}-${points.length}-${Math.round(max)}`;
 
   const xOf = (index: number) => (index / (points.length - 1)) * W;
   const yOf = (value: number) =>
@@ -54,15 +67,15 @@ export function AreaChart({
   return (
     <svg
       viewBox={`0 0 ${W} ${height}`}
-      style={{ display: "block", width: "100%", height: "auto" }}
+      style={{ display: "block", width: "100%", height: fixed ? height : "auto" }}
       role="img"
       aria-label="daily trend"
       preserveAspectRatio="none"
     >
       <defs>
         <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--main)" stopOpacity={0.18} />
-          <stop offset="100%" stopColor="var(--main)" stopOpacity={0} />
+          <stop offset="0%" stopColor="var(--main)" stopOpacity={fill === "solid" ? 0.2 : 0.18} />
+          <stop offset="100%" stopColor="var(--main)" stopOpacity={fill === "solid" ? 0.07 : 0} />
         </linearGradient>
       </defs>
 
@@ -94,6 +107,54 @@ export function AreaChart({
           <title>{`${niceDay(point.day)} · ${format(point.value)}`}</title>
         </rect>
       ))}
+    </svg>
+  );
+}
+
+/* ------------------------------------------------------------- sparkline */
+
+/**
+ * A row-sized trend: one stroke, no fill, no axes. Scaled to its own peak, so
+ * it shows the shape of someone's fortnight rather than how they compare —
+ * the column beside it already says that.
+ */
+export function Sparkline({
+  values,
+  width = 96,
+  height = 22,
+  label,
+}: {
+  values: number[];
+  width?: number;
+  height?: number;
+  label?: string;
+}) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values);
+  const pad = 2;
+  const xOf = (index: number) => (index / (values.length - 1)) * width;
+  const yOf = (value: number) =>
+    max > 0 ? height - pad - (value / max) * (height - pad * 2) : height - pad;
+  const line = values.map((value, index) => `${xOf(index)},${yOf(value)}`).join(" ");
+
+  return (
+    <svg
+      className="spark"
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={label ?? "recent trend"}
+    >
+      <polyline
+        points={line}
+        fill="none"
+        stroke={max > 0 ? "var(--main)" : "var(--sub)"}
+        strokeOpacity={max > 0 ? 0.9 : 0.4}
+        strokeWidth={1.25}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

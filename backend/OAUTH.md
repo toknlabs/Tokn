@@ -37,6 +37,10 @@ Authorization code with PKCE (S256 only), for public native clients
    under connected machines on `/account` as the app ("Eaon Desktop ·
    hostname"), where revoking it signs the app out.
 7. `POST /api/oauth/revoke` (RFC 7009) revokes a token. It always answers 200.
+8. An app signed in with `usage:write` can link the tokn command on the same
+   machine without a second sign-in: `POST /api/cli/link-code` with its token
+   returns `{ code, expiresAt }`, the same single-use code `/link` shows, and
+   `tokn link --code <code>` redeems it. Eaon Desktop ships tokn and does this.
 
 Metadata is at `GET /.well-known/oauth-authorization-server` (RFC 8414).
 

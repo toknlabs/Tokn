@@ -58,6 +58,27 @@ export function niceDay(day: string): string {
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
+/** `2026-09-15` -> `Sep 15`, for chart axes where the year is understood. */
+export function shortDay(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return day;
+  return `${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
+}
+
+/**
+ * A run length, coarsely: `0m`, `47m`, `2h 5m`, `3d 4h`. Agents run for
+ * minutes to hours, so seconds would be noise and a bare hour count would
+ * hide most of the difference between two runs.
+ */
+export function duration(ms: number): string {
+  const minutes = Math.max(0, Math.floor((Number.isFinite(ms) ? ms : 0) / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 === 0 ? `${hours}h` : `${hours}h ${minutes % 60}m`;
+  const days = Math.floor(hours / 24);
+  return hours % 24 === 0 ? `${days}d` : `${days}d ${hours % 24}h`;
+}
+
 export function niceDate(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;

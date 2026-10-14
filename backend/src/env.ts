@@ -55,4 +55,9 @@ export const ENV = {
   },
   databaseId: process.env.TOKN_DATABASE_ID ?? "tokn",
   publicUrl: process.env.TOKN_PUBLIC_URL ?? "http://localhost:3000",
+  /**
+   * Where the Eaon Desktop board lives. Same deployment, second hostname: the
+   * web app's middleware serves the Eaon pages when a request arrives on it.
+   */
+  eaonUrl: process.env.TOKN_EAON_URL ?? "https://tokns.eaon.dev",
 };

@@ -3,15 +3,28 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { PROFILES_TAG, USAGE_TAG } from "./board-cache";
 import {
+  listAgents,
+  listAllAgents,
   listAllProfiles,
   listAllUsage,
   listAllUserTotals,
   listDevices,
   listUsage,
   listedFor,
+  summarizeAgents,
+  type AgentDoc,
+  type AgentSummary,
+  type Profile,
   type Totals,
   type UsageDoc,
 } from "./backend";
+import {
+  fixtureAgents,
+  fixtureProfiles,
+  fixtureSnapshotSource,
+  fixtureUsage,
+  fixturesOn,
+} from "./fixtures";
 
 /**
  * Every read the pages make — backed by Appwrite.
@@ -129,11 +142,44 @@ const CACHE_WARN_BYTES = 1_500_000;
  */
 type Cell = [day: string, model: number, cost: number, tokens: number, requests: number];
 
+/**
+ * An Eaon Desktop cell: a `Cell` plus the day's tokens by kind, which the
+ * Eaon site's ratios (cache hit rate, output share) are made of. Only Eaon's
+ * rows carry the split, so the main board's snapshot stays the size it was.
+ */
+type EaonCell = [
+  day: string,
+  model: number,
+  cost: number,
+  tokens: number,
+  requests: number,
+  input: number,
+  output: number,
+  cacheRead: number,
+  cacheWrite: number,
+];
+
+/** One user's agent runs for one day, tools folded together. */
+type AgentCell = [day: string, runs: number, totalMs: number, longestMs: number];
+
+/**
+ * The usage `tool` Eaon Desktop reports under. Its board is the same snapshot
+ * filtered to this tool, so it costs no reads of its own.
+ */
+export const EAON_TOOL = "eaon";
+
 interface UsageSlice {
   /** When the reads began. A sync that lands after this is not in it. */
   capturedAt: string;
   models: string[];
   users: Record<string, Cell[]>;
+  /**
+   * The same cells again, for Eaon Desktop's rows only. The main board folds
+   * the tool away, and the Eaon board is exactly the part it folds.
+   */
+  eaon: Record<string, EaonCell[]>;
+  /** Agent runs per user per day. One row per active day, so it stays small. */
+  agents: Record<string, AgentCell[]>;
 }
 
 type TotalsRow = Pick<
@@ -152,11 +198,52 @@ interface Delta {
 const tokensOf = (row: UsageDoc): number =>
   row.input + row.output + row.cacheWrite5m + row.cacheWrite1h + row.cacheRead;
 
-function compactUsage(rows: UsageDoc[], capturedAt: string): UsageSlice {
+export function compactUsage(
+  rows: UsageDoc[],
+  capturedAt: string,
+  agentRows: Pick<AgentDoc, "userId" | "day" | "runs" | "totalMs" | "longestMs">[] = [],
+): UsageSlice {
   const models: string[] = [];
   const modelIndex = new Map<string, number>();
   const cells = new Map<string, Cell>();
+  const eaonCells = new Map<string, EaonCell>();
   const users: Record<string, Cell[]> = {};
+  const eaon: Record<string, EaonCell[]> = {};
+
+  const fold = (row: UsageDoc, model: number) => {
+    const key = `${row.userId}|${row.day}|${model}`;
+    const hit = cells.get(key);
+    if (hit) {
+      hit[2] += row.costUsd;
+      hit[3] += tokensOf(row);
+      hit[4] += row.requests;
+      return;
+    }
+
+    const cell: Cell = [row.day, model, row.costUsd, tokensOf(row), row.requests];
+    cells.set(key, cell);
+    (users[row.userId] ??= []).push(cell);
+  };
+
+  const foldEaon = (row: UsageDoc, model: number) => {
+    const key = `${row.userId}|${row.day}|${model}`;
+    const write = row.cacheWrite5m + row.cacheWrite1h;
+    const hit = eaonCells.get(key);
+    if (hit) {
+      hit[2] += row.costUsd;
+      hit[3] += tokensOf(row);
+      hit[4] += row.requests;
+      hit[5] += row.input;
+      hit[6] += row.output;
+      hit[7] += row.cacheRead;
+      hit[8] += write;
+      return;
+    }
+
+    const cell: EaonCell = [row.day, model, row.costUsd, tokensOf(row), row.requests, row.input, row.output, row.cacheRead, write];
+    eaonCells.set(key, cell);
+    (eaon[row.userId] ??= []).push(cell);
+  };
 
   for (const row of rows) {
     let model = modelIndex.get(row.model);
@@ -166,21 +253,27 @@ function compactUsage(rows: UsageDoc[], capturedAt: string): UsageSlice {
       modelIndex.set(row.model, model);
     }
 
-    const key = `${row.userId}|${row.day}|${model}`;
-    const hit = cells.get(key);
-    if (hit) {
-      hit[2] += row.costUsd;
-      hit[3] += tokensOf(row);
-      hit[4] += row.requests;
-      continue;
-    }
-
-    const cell: Cell = [row.day, model, row.costUsd, tokensOf(row), row.requests];
-    cells.set(key, cell);
-    (users[row.userId] ??= []).push(cell);
+    fold(row, model);
+    if (row.tool === EAON_TOOL) foldEaon(row, model);
   }
 
-  return { capturedAt, models, users };
+  const agentCells = new Map<string, AgentCell>();
+  const agents: Record<string, AgentCell[]> = {};
+  for (const row of agentRows) {
+    const key = `${row.userId}|${row.day}`;
+    const hit = agentCells.get(key);
+    if (hit) {
+      hit[1] += row.runs;
+      hit[2] += row.totalMs;
+      hit[3] = Math.max(hit[3], row.longestMs);
+      continue;
+    }
+    const cell: AgentCell = [row.day, row.runs, row.totalMs, row.longestMs];
+    agentCells.set(key, cell);
+    (agents[row.userId] ??= []).push(cell);
+  }
+
+  return { capturedAt, models, users, eaon, agents };
 }
 
 function warnIfLarge(label: string, value: unknown): void {
@@ -203,11 +296,14 @@ function warnIfLarge(label: string, value: unknown): void {
 const cachedUsageBase = unstable_cache(
   async (): Promise<UsageSlice> => {
     const capturedAt = new Date().toISOString();
-    const slice = compactUsage(await listAllUsage(), capturedAt);
+    const [usage, agents] = await Promise.all([listAllUsage(), listAllAgents()]);
+    const slice = compactUsage(usage, capturedAt, agents);
     warnIfLarge("usage snapshot", slice);
     return slice;
   },
-  ["board:usage-base"],
+  // Versioned with the slice's shape: an entry cached before the Eaon cells
+  // existed would otherwise be served for up to a day with none in it.
+  ["board:usage-base:v3"],
   { revalidate: 86_400, tags: [USAGE_TAG] },
 );
 
@@ -226,7 +322,10 @@ const cachedUsageDelta = unstable_cache(
     const changed = totals
       .filter((row) => row.lastSyncAt && row.lastSyncAt >= since)
       .map((row) => row.userId);
-    const rows = (await Promise.all(changed.map((userId) => listUsage(userId)))).flat();
+    const [rows, agents] = await Promise.all([
+      Promise.all(changed.map((userId) => listUsage(userId))).then((all) => all.flat()),
+      Promise.all(changed.map((userId) => listAgents(userId))).then((all) => all.flat()),
+    ]);
 
     return {
       capturedAt,
@@ -240,18 +339,22 @@ const cachedUsageDelta = unstable_cache(
         lastDay: row.lastDay ?? null,
       })),
       changed,
-      usage: compactUsage(rows, capturedAt),
+      usage: compactUsage(rows, capturedAt, agents),
     };
   },
-  ["board:usage-delta"],
+  ["board:usage-delta:v3"],
   { revalidate: BOARD_REFRESH_SECONDS * 2 },
 );
 
 /** Every profile. Cleared on any change to one, with an hourly backstop. */
-const cachedProfiles = unstable_cache(async () => listAllProfiles(), ["board:profiles"], {
+const storedProfiles = unstable_cache(async () => listAllProfiles(), ["board:profiles"], {
   revalidate: BOARD_REFRESH_SECONDS,
   tags: [PROFILES_TAG],
 });
+
+/** The profile list, or the dev fixtures when those are switched on. */
+const cachedProfiles = async (): Promise<Profile[]> =>
+  fixturesOn() ? fixtureProfiles() : storedProfiles();
 
 const currentHour = (): number => Math.floor(Date.now() / (BOARD_REFRESH_SECONDS * 1000));
 
@@ -264,10 +367,29 @@ interface BoardRow {
   requests: number;
 }
 
+/** An Eaon Desktop row, with its tokens by kind. */
+export interface EaonBoardRow extends BoardRow {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+interface AgentBoardRow {
+  userId: string;
+  day: string;
+  runs: number;
+  totalMs: number;
+  longestMs: number;
+}
+
 interface Snapshot {
   /** When the numbers on the board were read. */
   updatedAt: string;
   rows: BoardRow[];
+  /** Eaon Desktop's share of `rows`. */
+  eaonRows: EaonBoardRow[];
+  agents: AgentBoardRow[];
   totals: TotalsRow[];
 }
 
@@ -281,6 +403,24 @@ let decoded: { key: string; snapshot: Snapshot } | null = null;
  * share a single fetch from the data cache.
  */
 const snapshot = cache(async (): Promise<Snapshot> => {
+  // Dev only: a fixed cast of placeholder accounts, so the board can be seen
+  // without a database. `fixturesOn` is false in every production build.
+  if (fixturesOn()) {
+    const source = fixtureSnapshotSource();
+    const key = `fixtures|${source.capturedAt}`;
+    if (decoded?.key === key) return decoded.snapshot;
+    const base = compactUsage(source.usage, source.capturedAt, source.agents);
+    const empty = compactUsage([], source.capturedAt);
+    const next = decode(base, {
+      capturedAt: source.capturedAt,
+      totals: source.totals,
+      changed: [],
+      usage: empty,
+    });
+    decoded = { key, snapshot: next };
+    return next;
+  }
+
   const base = await cachedUsageBase();
   const since = new Date(Date.parse(base.capturedAt) - SYNC_SKEW_MS).toISOString();
   const delta = await cachedUsageDelta(currentHour(), since);
@@ -288,27 +428,69 @@ const snapshot = cache(async (): Promise<Snapshot> => {
   const key = `${base.capturedAt}|${delta.capturedAt}`;
   if (decoded?.key === key) return decoded.snapshot;
 
+  const next = decode(base, delta);
+  decoded = { key, snapshot: next };
+  return next;
+});
+
+/** The base with the delta laid over it, as plain rows. */
+function decode(base: UsageSlice, delta: Delta): Snapshot {
   const rows: BoardRow[] = [];
+  const eaonRows: EaonBoardRow[] = [];
+  const agents: AgentBoardRow[] = [];
+
   const add = (slice: UsageSlice, userId: string, cells: Cell[]) => {
     for (const [day, model, cost, tokens, requests] of cells) {
       rows.push({ userId, day, model: slice.models[model] ?? "unknown", cost, tokens, requests });
+    }
+  };
+  const addEaon = (slice: UsageSlice, userId: string, cells: EaonCell[]) => {
+    for (const [day, model, cost, tokens, requests, input = 0, output = 0, cacheRead = 0, cacheWrite = 0] of cells) {
+      eaonRows.push({ userId, day, model: slice.models[model] ?? "unknown", cost, tokens, requests, input, output, cacheRead, cacheWrite });
+    }
+  };
+  const addAgents = (userId: string, cells: AgentCell[]) => {
+    for (const [day, runs, totalMs, longestMs] of cells) {
+      agents.push({ userId, day, runs, totalMs, longestMs });
     }
   };
 
   // A user in the delta is replaced wholesale: syncs upsert, so their fresh
   // rows are the whole truth and the base's copy is simply older.
   const replaced = new Set(delta.changed);
-  for (const [userId, cells] of Object.entries(base.users)) {
-    if (!replaced.has(userId)) add(base, userId, cells);
-  }
-  for (const [userId, cells] of Object.entries(delta.usage.users)) {
-    add(delta.usage, userId, cells);
+  const layers: [UsageSlice, (userId: string) => boolean][] = [
+    [base, (userId) => !replaced.has(userId)],
+    [delta.usage, () => true],
+  ];
+  for (const [slice, keep] of layers) {
+    for (const [userId, cells] of Object.entries(slice.users)) {
+      if (keep(userId)) add(slice, userId, cells);
+    }
+    // `?? {}`: a slice cached by an older build has neither.
+    for (const [userId, cells] of Object.entries(slice.eaon ?? {})) {
+      if (keep(userId)) addEaon(slice, userId, cells);
+    }
+    for (const [userId, cells] of Object.entries(slice.agents ?? {})) {
+      if (keep(userId)) addAgents(userId, cells);
+    }
   }
 
-  const next: Snapshot = { updatedAt: delta.capturedAt, rows, totals: delta.totals };
-  decoded = { key, snapshot: next };
-  return next;
-});
+  return { updatedAt: delta.capturedAt, rows, eaonRows, agents, totals: delta.totals };
+}
+
+/**
+ * The Eaon Desktop part of the snapshot, with every profile, for the Eaon
+ * site's own figures (lib/eaon.ts). The same cached read the boards use.
+ */
+export async function eaonSnapshot(): Promise<{
+  updatedAt: string;
+  rows: EaonBoardRow[];
+  agents: AgentBoardRow[];
+  profiles: Profile[];
+}> {
+  const [shot, profiles] = await Promise.all([snapshot(), cachedProfiles()]);
+  return { updatedAt: shot.updatedAt, rows: shot.eaonRows, agents: shot.agents, profiles };
+}
 
 /** When the numbers on the board were last read, for the "updated" note. */
 export async function boardUpdatedAt(): Promise<string> {
@@ -762,12 +944,25 @@ export interface UserStats {
 export async function userStats(
   userId: string,
   period: Period = "all",
+  options: { tool?: string } = {},
 ): Promise<UserStats> {
   const start = periodStart(period);
   // One user's rows, queried directly rather than filtered out of the
   // board-wide snapshot — a profile page should not pay for everyone's data.
-  const rows = (await listUsage(userId)).filter((row) => inWindow(row, start));
+  // The Eaon profile passes a tool and sees only what Eaon Desktop reported.
+  const rows = (await usageRows(userId)).filter(
+    (row) => inWindow(row, start) && (!options.tool || row.tool === options.tool),
+  );
+  return statsFromRows(rows);
+}
 
+/** One user's raw rows: the database, or the dev fixtures. */
+async function usageRows(userId: string): Promise<UsageDoc[]> {
+  return fixturesOn() ? fixtureUsage(userId) : listUsage(userId);
+}
+
+/** Fold one user's rows into everything a profile draws. */
+export function statsFromRows(rows: UsageDoc[]): UserStats {
   const days = new Map<string, DayPoint>();
   const models = new Map<string, ModelPoint>();
   const tools = new Map<
@@ -873,11 +1068,25 @@ export async function userStats(
 }
 
 /**
+ * One user's agent runs: how many, how long in all, and the longest single
+ * run. Read directly, like `userStats`, so a sync shows at once.
+ */
+export async function agentStats(
+  userId: string,
+  options: { tool?: string } = {},
+): Promise<AgentSummary> {
+  const rows = fixturesOn()
+    ? fixtureAgents(userId).filter((row) => !options.tool || row.tool === options.tool)
+    : await listAgents(userId, options);
+  return summarizeAgents(rows);
+}
+
+/**
  * A streak is consecutive days with any usage. The current streak only counts
  * if it reaches today or yesterday — the day is not over everywhere at once, so
  * ending "yesterday" must not break it.
  */
-function computeStreaks(days: string[]): { current: number; longest: number } {
+export function computeStreaks(days: string[]): { current: number; longest: number } {
   if (days.length === 0) return { current: 0, longest: 0 };
 
   let longest = 1;
@@ -897,6 +1106,220 @@ function computeStreaks(days: string[]): { current: number; longest: number } {
   const live = last === now || last === shiftDay(now, -1);
 
   return { current: live ? run : 0, longest };
+}
+
+/* ------------------------------------------------------------ eaon board */
+
+/**
+ * The Eaon Desktop board: everyone who has used the app, ranked by the tokens
+ * it reported.
+ *
+ * Built from the same hourly snapshot as the main board — the Eaon cells are
+ * collected while the snapshot is folded, and agent runs are read alongside
+ * the usage — so a page view costs no database reads. Privacy follows the
+ * main board exactly: private and opted-out accounts are never ranked, and
+ * still count, anonymously, toward the totals above the table.
+ */
+
+export type EaonPeriod = "7d" | "30d" | "all";
+
+export const EAON_PERIODS: { key: EaonPeriod; label: string }[] = [
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "all", label: "all time" },
+];
+
+export function isEaonPeriod(value: string | undefined): value is EaonPeriod {
+  return value === "7d" || value === "30d" || value === "all";
+}
+
+function eaonStart(period: EaonPeriod): string | null {
+  if (period === "7d") return shiftDay(today(), -6);
+  if (period === "30d") return shiftDay(today(), -29);
+  return null;
+}
+
+/** Days in each row's sparkline. Two weeks shows a habit without the noise. */
+export const EAON_SPARK_DAYS = 14;
+
+export interface EaonEntry {
+  rank: number;
+  userId: string;
+  handle: string;
+  name: string | null;
+  avatarUrl: string | null;
+  prefs: string | null;
+  joined: string;
+  /** Within the period. */
+  tokens: number;
+  cost: number;
+  runs: number;
+  agentMs: number;
+  /** All-time, like a profile's. */
+  streak: number;
+  lastDay: string | null;
+  /** Tokens per day for the last `EAON_SPARK_DAYS` days, oldest first. */
+  series: number[];
+}
+
+export async function eaonBoard(period: EaonPeriod, limit = 100): Promise<EaonEntry[]> {
+  const [{ eaonRows, agents }, profiles] = await Promise.all([snapshot(), cachedProfiles()]);
+  const start = eaonStart(period);
+  const sparkStart = shiftDay(today(), -(EAON_SPARK_DAYS - 1));
+  const sparkIndex = new Map(
+    Array.from({ length: EAON_SPARK_DAYS }, (_, index) => [shiftDay(sparkStart, index), index]),
+  );
+
+  interface Acc {
+    tokens: number;
+    cost: number;
+    runs: number;
+    agentMs: number;
+    days: Set<string>;
+    lastDay: string | null;
+    series: number[];
+  }
+  const byUser = new Map<string, Acc>();
+  const accFor = (userId: string): Acc => {
+    let acc = byUser.get(userId);
+    if (!acc) {
+      acc = {
+        tokens: 0,
+        cost: 0,
+        runs: 0,
+        agentMs: 0,
+        days: new Set(),
+        lastDay: null,
+        series: new Array<number>(EAON_SPARK_DAYS).fill(0),
+      };
+      byUser.set(userId, acc);
+    }
+    return acc;
+  };
+
+  for (const row of eaonRows) {
+    if (row.tokens <= 0 && row.requests <= 0) continue;
+    const acc = accFor(row.userId);
+    acc.days.add(row.day);
+    if (!acc.lastDay || row.day > acc.lastDay) acc.lastDay = row.day;
+    if (inWindow(row, start)) {
+      acc.tokens += row.tokens;
+      acc.cost += row.cost;
+    }
+    const position = sparkIndex.get(row.day);
+    if (position !== undefined) acc.series[position] = (acc.series[position] ?? 0) + row.tokens;
+  }
+
+  for (const row of agents) {
+    if (row.runs <= 0) continue;
+    const acc = accFor(row.userId);
+    acc.days.add(row.day);
+    if (!acc.lastDay || row.day > acc.lastDay) acc.lastDay = row.day;
+    if (inWindow(row, start)) {
+      acc.runs += row.runs;
+      acc.agentMs += row.totalMs;
+    }
+  }
+
+  const entries: EaonEntry[] = [];
+  for (const profile of profiles) {
+    // Same rule as the main board: private or opted out is never ranked.
+    if (!listedFor(profile)) continue;
+    const acc = byUser.get(profile.$id);
+    if (!acc) continue;
+
+    entries.push({
+      rank: 0,
+      userId: profile.$id,
+      handle: profile.handle,
+      name: profile.name ?? null,
+      avatarUrl: profile.avatarUrl ?? null,
+      prefs: profile.prefs ?? null,
+      joined: profile.createdAt,
+      tokens: acc.tokens,
+      cost: acc.cost,
+      runs: acc.runs,
+      agentMs: acc.agentMs,
+      streak: computeStreaks([...acc.days].sort()).current,
+      lastDay: acc.lastDay,
+      series: acc.series,
+    });
+  }
+
+  return entries
+    .sort(
+      (a, b) =>
+        b.tokens - a.tokens ||
+        b.runs - a.runs ||
+        a.joined.localeCompare(b.joined) ||
+        a.handle.localeCompare(b.handle),
+    )
+    .map((entry, index) => ({ ...entry, rank: index + 1 }))
+    .slice(0, limit);
+}
+
+export interface EaonTotals {
+  /** Everyone with Eaon activity in the period, ranked or not. */
+  users: number;
+  tokens: number;
+  cost: number;
+  runs: number;
+  agentMs: number;
+  /** Tokens per day across everyone, dense over the period. */
+  series: SeriesPoint[];
+}
+
+interface SeriesPoint {
+  day: string;
+  value: number;
+}
+
+export async function eaonTotals(period: EaonPeriod): Promise<EaonTotals> {
+  const { eaonRows, agents } = await snapshot();
+  const start = eaonStart(period);
+  const users = new Set<string>();
+  const byDay = new Map<string, number>();
+  let tokens = 0;
+  let cost = 0;
+  let runs = 0;
+  let agentMs = 0;
+  let first: string | null = null;
+
+  for (const row of eaonRows) {
+    if (!inWindow(row, start)) continue;
+    users.add(row.userId);
+    tokens += row.tokens;
+    cost += row.cost;
+    byDay.set(row.day, (byDay.get(row.day) ?? 0) + row.tokens);
+    if (!first || row.day < first) first = row.day;
+  }
+  for (const row of agents) {
+    if (row.runs <= 0 || !inWindow(row, start)) continue;
+    users.add(row.userId);
+    runs += row.runs;
+    agentMs += row.totalMs;
+  }
+
+  // Dense, so a quiet day draws as a dip rather than as a straight line
+  // across it.
+  const now = today();
+  const from = start ?? first ?? now;
+  const series: SeriesPoint[] = [];
+  for (let day = from; day <= now; day = shiftDay(day, 1)) {
+    series.push({ day, value: byDay.get(day) ?? 0 });
+  }
+
+  return { users: users.size, tokens, cost, runs, agentMs, series };
+}
+
+/** Where someone stands on the Eaon board, or null if they are not on it. */
+export async function eaonRankOf(
+  userId: string,
+  period: EaonPeriod = "all",
+): Promise<number | null> {
+  const board = await eaonBoard(period, 100_000);
+  const entry = board.find((row) => row.userId === userId);
+  return entry && entry.tokens > 0 ? entry.rank : null;
 }
 
 /* --------------------------------------------------------------- devices */

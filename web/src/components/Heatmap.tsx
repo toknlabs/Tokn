@@ -1,4 +1,4 @@
-import { money, niceDay } from "@/lib/format";
+import { compact, money, niceDay } from "@/lib/format";
 import { toDay } from "@/lib/stats";
 
 /**
@@ -14,13 +14,28 @@ export interface HeatmapDay {
   day: string;
   cost: number;
   requests: number;
+  tokens?: number;
 }
 
 const MONTHS = "JFMAMJJASOND";
 const DAY_LABELS = ["", "M", "", "W", "", "F", ""];
 
-export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: number }) {
+export function Heatmap({
+  days,
+  weeks = 53,
+  by = "cost",
+  round = false,
+}: {
+  days: HeatmapDay[];
+  weeks?: number;
+  /** What a dot's shade measures. Spend by default; the Eaon profile counts tokens. */
+  by?: "cost" | "tokens";
+  /** Round dots rather than squares. */
+  round?: boolean;
+}) {
   const byDay = new Map(days.map((entry) => [entry.day, entry]));
+  const valueOf = (entry: HeatmapDay | undefined): number =>
+    entry ? (by === "tokens" ? (entry.tokens ?? 0) : entry.cost) : 0;
 
   // Wind back to the Sunday that starts the window so the columns line up.
   const end = new Date();
@@ -29,7 +44,7 @@ export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: numb
   cursor.setUTCDate(cursor.getUTCDate() - (weeks * 7 - 1));
   cursor.setUTCDate(cursor.getUTCDate() - cursor.getUTCDay());
 
-  const thresholds = quartiles(days.map((entry) => entry.cost).filter((cost) => cost > 0));
+  const thresholds = quartiles(days.map(valueOf).filter((value) => value > 0));
 
   const columns: { key: string; month: number; cells: { day: string; future: boolean }[] }[] = [];
 
@@ -48,12 +63,23 @@ export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: numb
 
   return (
     <div className="scroll-x">
-      <div className="heat" style={{ minWidth: columns.length * 15 + 24 }}>
+      <div
+        className={round ? "heat round" : "heat"}
+        // Round dots spread to the full width instead of sitting at the left
+        // of it; each week is a column of the grid rather than a fixed 15px.
+        style={
+          round
+            ? ({ minWidth: columns.length * 16 + 24, "--weeks": columns.length } as React.CSSProperties)
+            : { minWidth: columns.length * 15 + 24 }
+        }
+      >
         <div className="heat-months">
           {columns.map((column, index) => (
             <span
               key={column.key}
-              style={{ width: 11, marginRight: index === columns.length - 1 ? 0 : 4 }}
+              style={
+                round ? undefined : { width: 11, marginRight: index === columns.length - 1 ? 0 : 4 }
+              }
             >
               {/* The initial goes on the first column that lands in a month. */}
               {index === 0 || columns[index - 1]!.month !== column.month
@@ -74,7 +100,7 @@ export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: numb
             <div className="heat-col" key={column.key}>
               {column.cells.map((cell) => {
                 const entry = byDay.get(cell.day);
-                const level = cell.future ? 0 : levelFor(entry?.cost ?? 0, thresholds);
+                const level = cell.future ? 0 : levelFor(valueOf(entry), thresholds);
                 return (
                   <span
                     key={cell.day}
@@ -83,7 +109,9 @@ export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: numb
                     style={cell.future ? { opacity: 0.4 } : undefined}
                     title={
                       entry
-                        ? `${niceDay(cell.day)} · ${money(entry.cost)} · ${entry.requests} requests`
+                        ? by === "tokens"
+                          ? `${niceDay(cell.day)} · ${compact(entry.tokens ?? 0)} tokens`
+                          : `${niceDay(cell.day)} · ${money(entry.cost)} · ${entry.requests} requests`
                         : `${niceDay(cell.day)} · no usage`
                     }
                   />

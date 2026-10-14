@@ -235,6 +235,11 @@ export async function deleteAccount(userId: string): Promise<{ removed: Record<s
   };
 
   await purge("usage_daily");
+  // Provisioned later than the rest; an install without it has nothing to
+  // remove there, and that must not stop the account being erased.
+  await purge("agent_daily").catch((error) => {
+    if (!isNotFound(error)) throw error;
+  });
   await purge("devices");
   await purge("link_codes");
   await purge("sessions");

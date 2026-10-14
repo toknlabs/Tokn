@@ -29,6 +29,7 @@ import {
   type LinkCode as BackendLinkCode,
   type Profile,
 } from "./backend";
+import { fixtureProfile, fixturesOn } from "./fixtures";
 
 /**
  * Accounts, browser sessions and CLI device tokens — backed by Appwrite.
@@ -184,6 +185,11 @@ export function toPublicUser(row: UserRow): PublicUser {
 /* ------------------------------------------------------------------ users */
 
 export async function findUserByHandle(handle: string): Promise<UserRow | undefined> {
+  // Dev only; see lib/fixtures.ts. Never true in a production build.
+  if (fixturesOn()) {
+    const fixture = fixtureProfile(handle);
+    return fixture ? toUserRow(fixture) : undefined;
+  }
   const profile = await findProfileByHandle(handle);
   return profile ? toUserRow(profile) : undefined;
 }

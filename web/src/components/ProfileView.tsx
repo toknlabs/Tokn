@@ -1,10 +1,7 @@
-import Link from "next/link";
 import { AreaChart, ShareBars, StackedDays } from "@/components/Charts";
 import { PagedBars } from "@/components/PagedBars";
-import { Avatar } from "@/components/Avatar";
 import { Heatmap } from "@/components/Heatmap";
-import { ShareButton } from "@/components/ShareButton";
-import { SocialIcon } from "@/components/SocialIcon";
+import { ProfileTop, spendSince, type ProfileUser } from "@/components/ProfileTop";
 import {
   compact,
   count,
@@ -13,7 +10,6 @@ import {
   percent,
   sinceDay,
 } from "@/lib/format";
-import { parseLinks } from "@/lib/links";
 import {
   KIND_LABELS,
   hasPricedPlan,
@@ -25,13 +21,21 @@ import {
 } from "@/lib/plans";
 import { modelLabel } from "@/lib/pricing";
 import {
-  STAT_LABELS,
+  AGENT_STATS,
+  hasOwnStats,
   parsePrefs,
   type BlockKey,
   type ProfilePrefs,
-  type StatKey,
 } from "@/lib/prefs";
-import { userStats, type UserStats } from "@/lib/stats";
+import {
+  EAON_TOOL,
+  agentStats,
+  eaonRankOf,
+  userStats,
+  type UserStats,
+} from "@/lib/stats";
+import { fixturesOn } from "@/lib/fixtures";
+import { eaonPaths, eaonProfileUrl } from "@/lib/sites";
 import { CostAnatomy } from "@/components/CostAnatomy";
 import { Savings } from "@/components/Savings";
 import {
@@ -41,11 +45,18 @@ import {
   whatIf as whatIfFor,
 } from "@/lib/backend";
 
+export type { ProfileUser };
+
 /**
  * The profile, shared by /profile/[handle] and /account.
  *
  * A stack of blocks with nothing drawn around them: a label, the figure, and
  * the shape of it. Separation is the gap between blocks and nothing else.
+ *
+ * The top — identity, four figures, the year of dots, the tokens line and a
+ * row of facts — is `ProfileTop`, the same component the Eaon profile draws.
+ * What follows it is the longer read: the owner's chosen blocks, then the
+ * cost anatomy.
  *
  * Which blocks appear, in what order, which four figures lead, the accent and
  * the avatar all come from the owner's preferences. The accent is scoped with
@@ -56,21 +67,6 @@ import {
  * more round trips, and the series is a few thousand rows even for the
  * heaviest user on the board.
  */
-
-export interface ProfileUser {
-  id: string;
-  handle: string;
-  name: string | null;
-  bio: string | null;
-  createdAt: string;
-  billing: string;
-  links: string | null;
-  prefs: string | null;
-  plans: string | null;
-  avatarUrl: string | null;
-  isPublic: boolean;
-  listed: boolean;
-}
 
 const WINDOW_DAYS = 90;
 
@@ -91,142 +87,94 @@ export async function ProfileView({
    */
   identity?: boolean;
 }) {
+  // The local fixtures have no rows for the anatomy to read; see lib/fixtures.
+  const fixtures = fixturesOn();
+
   // Fetched together: four round trips in series would be felt, and the
   // anatomy needs the same rows the summary already walks.
-  const [stats, anatomy, whatIf] = await Promise.all([
+  const [stats, agents, eaonRank, anatomy, whatIf] = await Promise.all([
     userStats(user.id, "all"),
-    anatomyFor(user.id),
-    whatIfFor(user.id),
+    agentStats(user.id),
+    user.listed ? eaonRankOf(user.id) : null,
+    fixtures ? null : anatomyFor(user.id),
+    fixtures ? null : whatIfFor(user.id),
   ]);
-  const benchmark = await reuseBenchmark(user.id, anatomy);
+  const benchmark = anatomy ? await reuseBenchmark(user.id, anatomy) : null;
   const prefs = parsePrefs(user.prefs);
-  const links = parseLinks(user.links);
   const plans = parsePlans(user.plans);
   const hasUsage = stats.totals.requests > 0;
   const recent = stats.byDay.slice(-WINDOW_DAYS);
+  const hasEaon = stats.byTool.some((entry) => entry.tool === EAON_TOOL);
+
+  // Someone who never chose their four figures and runs agents gets the agent
+  // row; a choice they made is never overridden.
+  const statKeys =
+    !hasOwnStats(user.prefs) && agents.runs > 0 ? AGENT_STATS : prefs.stats;
 
   return (
     <div data-accent={prefs.accent} style={{ display: "contents" }}>
-      {identity && (
-        <section className="row spread">
-          <div className="profile-head">
-            <Avatar
-              handle={user.handle}
-              size={44}
-              style={prefs.avatar}
-              url={user.avatarUrl}
-            />
-            <div style={{ minWidth: 0 }}>
-              <h1 className="profile-name">
-                {user.name?.trim() || user.handle}
-              </h1>
-              <div className="profile-handle">
-                <span>@{user.handle}</span>
-                {user.billing === "subscription" && (
-                  <span className="tag">plan</span>
-                )}
-                {rank && (
-                  <Link href="/" className="tag on link">
-                    #{rank}
-                  </Link>
-                )}
-                {own && !user.isPublic && <span className="tag">private</span>}
-                {own && user.isPublic && !user.listed && (
-                  <span className="tag">unlisted</span>
-                )}
-              </div>
-            </div>
-          </div>
+      <ProfileTop
+        user={user}
+        stats={stats}
+        agents={agents}
+        plans={plans}
+        statKeys={statKeys}
+        avatarStyle={prefs.avatar}
+        own={own}
+        identity={identity}
+        rank={rank}
+        rankHref="/"
+        rankTitle="rank on the tokn board"
+        eaonRank={eaonRank}
+        eaonBoardHref={eaonPaths("tokn").board}
+        crossLink={
+          hasEaon && user.isPublic
+            ? { href: eaonProfileUrl(user.handle), label: "eaon desktop profile" }
+            : null
+        }
+        showActivity={prefs.blocks.includes("activity")}
+        empty={
+          <>
+            <p className="empty">
+              {own ? (
+                <>
+                  nothing reported yet — connect a machine and run{" "}
+                  <span className="kbd">tokn sync</span>
+                </>
+              ) : (
+                "this account has not reported any usage yet"
+              )}
+            </p>
+            {/* Declared, not measured, so it stands on its own: someone who has
+                listed their plans but not synced yet still has something to
+                show, and hiding it would be the one section that needs no data
+                waiting on data. */}
+            {plans.length > 0 && <Plans plans={plans} stats={stats} own={own} />}
+          </>
+        }
+      />
 
-          <div className="row" style={{ gap: "0.5rem" }}>
-            <ShareButton handle={user.handle} />
-            {own && (
-              <Link href="/account/settings" className="btn">
-                edit
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
-
-      {identity && (links.length > 0 || user.bio || own) && (
-        <section
-          className="row"
-          style={{ gap: "1.5rem", marginTop: "-1.75rem", fontSize: "0.75rem" }}
-        >
-          <span className="sub">joined {sinceJoin(user.createdAt)}</span>
-
-          {links.length > 0 && (
-            <div className="links">
-              {links.map((link) => (
-                <a
-                  key={link.url}
-                  href={link.url}
-                  target="_blank"
-                  rel="me noreferrer noopener"
-                >
-                  <SocialIcon provider={link.provider} size={13} />
-                  {link.label}
-                </a>
-              ))}
-            </div>
-          )}
-
-          {own && links.length === 0 && (
-            <Link href="/account/settings" className="sub link">
-              + add github or x
-            </Link>
-          )}
-
-          {user.bio && <span className="sub">{user.bio}</span>}
-        </section>
-      )}
-
-      <section className="stats">
-        {prefs.stats.map((key) => (
-          <Stat
-            key={key}
-            k={STAT_LABELS[key]}
-            {...statValue(key, stats, hasUsage, plans)}
-          />
-        ))}
-      </section>
-
-      {!hasUsage ? (
+      {hasUsage && (
         <>
-          <p className="empty">
-            {own ? (
-              <>
-                nothing reported yet — connect a machine and run{" "}
-                <span className="kbd">tokn sync</span>
-              </>
-            ) : (
-              "this account has not reported any usage yet"
-            )}
-          </p>
-          {/* Declared, not measured, so it stands on its own: someone who has
-              listed their plans but not synced yet still has something to
-              show, and hiding it would be the one section that needs no data
-              waiting on data. */}
-          {plans.length > 0 && <Plans plans={plans} stats={stats} own={own} />}
-        </>
-      ) : (
-        <>
-          {prefs.blocks.map((block) => (
-            <Block
-              key={block}
-              block={block}
-              stats={stats}
-              recent={recent}
-              prefs={prefs}
-              plans={plans}
-              own={own}
-            />
-          ))}
+          {/* The longer read, below the fold of the glance above. The
+              activity grid is already up there. */}
+          {prefs.blocks
+            .filter((block) => block !== "activity")
+            .map((block) => (
+              <Block
+                key={block}
+                block={block}
+                stats={stats}
+                recent={recent}
+                prefs={prefs}
+                plans={plans}
+                own={own}
+              />
+            ))}
           {/* Owner only. "What you could have spent less" is a statement
               about somebody's money and their judgement, and a leaderboard
               visitor has no business reading either. */}
-          {own && (
+          {own && anatomy && benchmark && whatIf && (
           <Savings
             anatomy={anatomy}
             benchmark={benchmark}
@@ -234,6 +182,7 @@ export async function ProfileView({
             own={own}
           />
           )}
+          {anatomy && benchmark && whatIf && (
           <CostAnatomy
             anatomy={anatomy}
             benchmark={benchmark}
@@ -242,6 +191,7 @@ export async function ProfileView({
             )}
             whatIf={whatIf}
           />
+          )}
         </>
       )}
     </div>
@@ -298,7 +248,7 @@ function Block({
     case "tokens":
       return (
         <Labelled
-          label="tokens"
+          label="token mix"
           value={`${compact(stats.totals.tokens)} tokens`}
           from={recent[0]?.day}
         >
@@ -406,18 +356,6 @@ function Labelled({
  * against the API-rate value of the work it actually carried. That ratio is
  * the whole argument for a plan, and nobody normally gets to see it.
  */
-/** Total spend over the last `days` calendar days, ending today. */
-function spendSince(stats: UserStats, days: number): number {
-  const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - (days - 1));
-  const from = cutoff.toISOString().slice(0, 10);
-
-  return stats.byDay.reduce(
-    (sum, point) => (point.day >= from ? sum + point.cost : sum),
-    0,
-  );
-}
-
 function Plans({ plans, stats, own }: { plans: Plan[]; stats: UserStats; own?: boolean }) {
   const monthly = monthlyTotal(plans);
   const priced = hasPricedPlan(plans);
@@ -497,64 +435,6 @@ function Plans({ plans, stats, own }: { plans: Plan[]; stats: UserStats; own?: b
   );
 }
 
-function Stat({ k, v, idle }: { k: string; v: string; idle?: boolean }) {
-  return (
-    <div className="stat">
-      <span className="k">{k}</span>
-      <span className={`v${idle ? " idle" : ""}`}>{v}</span>
-    </div>
-  );
-}
-
-/** One headline figure, chosen by the profile's owner. */
-function statValue(
-  key: StatKey,
-  stats: UserStats,
-  hasUsage: boolean,
-  plans: Plan[],
-): { v: string; idle?: boolean } {
-  const dash = { v: "—", idle: true };
-  if (!hasUsage && key !== "streak" && key !== "longestStreak") return dash;
-
-  switch (key) {
-    case "spend":
-      return { v: money(stats.totals.cost, 2) };
-    case "tokens":
-      return { v: compact(stats.totals.tokens) };
-    case "requests":
-      return { v: count(stats.totals.requests) };
-    case "activeDays":
-      return { v: count(stats.totals.days) };
-    case "streak":
-      return { v: `${stats.streak}d`, idle: stats.streak === 0 };
-    case "longestStreak":
-      return { v: `${stats.longestStreak}d`, idle: stats.longestStreak === 0 };
-    case "models":
-      return { v: String(stats.byModel.length) };
-    case "tools":
-      return { v: String(stats.byTool.length) };
-    case "perDay":
-      return {
-        v: money(stats.totals.cost / Math.max(stats.totals.days, 1), 2),
-      };
-    case "perRequest":
-      return {
-        v: money(stats.totals.cost / Math.max(stats.totals.requests, 1)),
-      };
-    case "biggestDay":
-      return stats.best ? { v: money(stats.best.cost, 2) } : dash;
-    case "planRoi": {
-      // A dash rather than a zero when there is nothing to compare against: an
-      // account with no priced subscription has no return, which is a
-      // different statement from a return of nothing.
-      const flat = subscriptionMonthly(plans);
-      const measured = spendSince(stats, 30);
-      if (flat <= 0 || measured <= 0) return dash;
-      return { v: `${(measured / flat).toFixed(1)}×` };
-    }
-  }
-}
-
 function Summary({ stats }: { stats: UserStats }) {
   const rows: [string, string][] = [
     ["requests", count(stats.totals.requests)],
@@ -608,15 +488,4 @@ function Summary({ stats }: { stats: UserStats }) {
       </dl>
     </section>
   );
-}
-
-/** "148 days ago", the way a profile reads it. */
-function sinceJoin(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "recently";
-
-  const days = Math.max(0, Math.floor((Date.now() - then) / 86_400_000));
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  return `${days} days ago`;
 }

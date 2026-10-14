@@ -35,6 +35,15 @@ export function usageRowId(
   return `u${sha(`${userId}|${day}|${tool}|${model}|${fast ? 1 : 0}`, MAX_ID - 1)}`;
 }
 
+/**
+ * Deterministic id for one day of agent runs. Same reasoning as `usageRowId`:
+ * the app re-sends its whole history, so the same (user, day, tool) has to land
+ * on the same row or every re-sync would add the day again.
+ */
+export function agentRowId(userId: string, day: string, tool: string): string {
+  return `a${sha(`${userId}|${day}|${tool}`, MAX_ID - 1)}`;
+}
+
 /** Totals are one row per user, addressed directly by user id. */
 export function totalsRowId(userId: string): string {
   return userId.length <= MAX_ID ? userId : `t${sha(userId, MAX_ID - 1)}`;

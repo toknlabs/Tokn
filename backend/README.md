@@ -23,6 +23,7 @@ npm run dev                    # standalone API on :8787
       |  POST /api/cli/link          |  cookie session
       |  GET  /api/cli/me            |  POST /api/link/code
       |  POST /api/cli/sync          |  GET  /api/leaderboard
+      |  POST /api/cli/link-code     |
       |  GET  /api/cli/pricing       |
       +--------------+---------------+
                      |
@@ -113,6 +114,26 @@ which stays the source of truth.
 
 `rankOf()` counts how many public users score strictly higher rather than
 materialising the whole board.
+
+## Agent runs (Eaon Desktop)
+
+`POST /api/cli/sync` takes an optional `agents` array next to `rows`:
+
+```json
+{ "rows": [...], "agents": [{ "day": "2026-10-12", "tool": "eaon", "runs": 4, "totalMs": 5400000, "longestMs": 2700000 }] }
+```
+
+Each entry is upserted into `agent_daily` on (user, day, tool) and replaces
+what that day held, exactly like usage rows. At most 5,000 entries; runs up to
+100,000 a day; no single run over 7 days; a total no longer than runs × 7 days.
+Small faults (negatives, fractions) are clamped; impossible values are refused
+per entry and listed in the reply's `agents.rejected`. An upload without
+`agents` leaves stored runs alone. Once someone has any `tool: "eaon"` usage,
+the reply carries `eaonProfileUrl` (`https://tokns.eaon.dev/@handle`).
+
+`agent_daily` must be provisioned (`npm run provision`) before runs are stored.
+Until then syncs still succeed with `agents.accepted: 0`, and every read
+treats the missing collection as "no runs".
 
 ## Wiring into the Next.js app — done
 

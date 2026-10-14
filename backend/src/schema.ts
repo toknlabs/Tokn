@@ -209,6 +209,30 @@ export const COLLECTIONS: Collection[] = [
   },
 
   {
+    id: "agent_daily",
+    name: "Daily agent runs",
+    purpose:
+      "One row per (user, day, tool): how many agent runs an app started that day and how long they ran. Sent by Eaon Desktop alongside its usage rows; the CLI has no notion of an agent run and never writes here. Row ids derive from the key, so a re-sync replaces a day rather than adding it again.",
+    attributes: [
+      { key: "userId", type: "string", size: 36, required: true },
+      { key: "day", type: "string", size: 10, required: true },
+      { key: "tool", type: "string", size: 32, required: true },
+      // Ceilings match the validation in repo/agents.ts, so a value the sync
+      // would refuse could not be written by hand either.
+      { key: "runs", type: "integer", default: 0, min: 0, max: 100_000 },
+      counter("totalMs"),
+      { key: "longestMs", type: "integer", default: 0, min: 0, max: 604_800_000 },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "user_day_tool_unique", type: "unique", attributes: ["userId", "day", "tool"] },
+      { key: "user_idx", type: "key", attributes: ["userId"] },
+      { key: "day_idx", type: "key", attributes: ["day"], orders: ["DESC"] },
+      { key: "tool_idx", type: "key", attributes: ["tool"] },
+    ],
+  },
+
+  {
     id: "user_totals",
     name: "User totals",
     purpose:

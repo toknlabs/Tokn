@@ -12,12 +12,15 @@ import {
 } from "@/components/Glyphs";
 import { SocialIcon } from "@/components/SocialIcon";
 import { TopBar } from "@/components/TopBar";
+import { EaonFooter, EaonHeader } from "@/components/eaon/EaonChrome";
 import { ThemePicker } from "@/components/ThemePicker";
 import { VersionChip } from "@/components/VersionChip";
 import { themeBootScript } from "@/components/theme";
 import { themeStylesheet } from "@/lib/themes";
 import { SOURCE_URL, X_HANDLE, X_URL } from "@/lib/site";
+import { TOKN_URL, currentSite } from "@/lib/sites";
 import "./globals.css";
+import "./eaon/eaon.css";
 
 /**
  * Geist Mono is the interface face. A table of numbers holds its shape with
@@ -72,6 +75,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const user = await currentUser();
+  // Set by middleware.ts for pages served on the Eaon host.
+  const site = await currentSite();
 
   return (
     <html
@@ -90,6 +95,15 @@ export default async function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
+        {site === "eaon" ? (
+          // tokns.eaon.dev is Eaon's own site: its frame, its colours, always
+          // dark (app/eaon/eaon.css). tokn's themes and chrome stop here.
+          <div className="eaon-site">
+            <EaonHeader toknUrl={TOKN_URL} boardHref="/" />
+            <main className="e-wrap">{children}</main>
+            <EaonFooter toknUrl={TOKN_URL} />
+          </div>
+        ) : (
         <div className="page">
           <TopBar user={user ? { handle: user.handle } : null} />
 
@@ -140,6 +154,7 @@ export default async function RootLayout({
             </footer>
           </div>
         </div>
+        )}
       </body>
     </html>
   );

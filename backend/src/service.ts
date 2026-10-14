@@ -1,7 +1,7 @@
 import { db, DB_ID, isConflict, isNotFound } from "./client.ts";
 import { ENV } from "./env.ts";
 import { totalsRowId } from "./ids.ts";
-import { authenticateDevice, redeemLinkCode, touchDevice } from "./repo/devices.ts";
+import { authenticateDevice, issueLinkCode, redeemLinkCode, touchDevice } from "./repo/devices.ts";
 import {
   HANDLE_CHANGE_LIMIT,
   HANDLE_RE,
@@ -15,7 +15,13 @@ import {
 import { refreshTotals, rankOf, getTotals } from "./repo/leaderboard.ts";
 import { assess } from "./repo/integrity.ts";
 import { listUsage, normalizeRow, summarize, upsertUsage, type SyncRow } from "./repo/usage.ts";
-import { deviceMayUpload, versionAfterSync } from "./oauth/devices.ts";
+import {
+  MAX_AGENT_ENTRIES,
+  normalizeAgents,
+  upsertAgents,
+  type AgentRejection,
+} from "./repo/agents.ts";
+import { deviceMayUpload, isOAuthDevice, versionAfterSync } from "./oauth/devices.ts";
 
 /**
  * The operations behind each API route.
@@ -75,6 +81,31 @@ export async function cliLink(
   return { token: result.token, user: toPublicUser(result.profile) };
 }
 
+/* -------------------------------------------------- POST /api/cli/link-code */
+
+/**
+ * A link code asked for by an app that is already signed in, for the tokn
+ * command on the same machine: Eaon Desktop ships tokn and links it with
+ * this, so nobody signs in twice. The code is the same short-lived,
+ * single-use kind the /link page shows, redeemed by `tokn link --code`.
+ *
+ * Only an app sign-in that may upload usage can ask. A CLI token can do no
+ * more than that (upload and read), so the token the code leads to gives the
+ * app nothing it didn't already have; a read-only app sign-in can't climb
+ * to an uploading one this way.
+ */
+export async function cliLinkCode(
+  authorization: string | null,
+): Promise<{ code: string; expiresAt: string } | ServiceError> {
+  const auth = await authenticateDevice(authorization);
+  if (!auth) return unlinked();
+  const id = auth.device.$id;
+  if (!isOAuthDevice(id) || !deviceMayUpload(id)) {
+    return fail(403, "only an app signed in with usage:write can link another program");
+  }
+  return issueLinkCode(auth.profile.$id);
+}
+
 /* --------------------------------------------------------- GET /api/cli/me */
 
 export async function cliMe(
@@ -92,6 +123,12 @@ const unlinked = (): ServiceError =>
 
 export interface SyncRequest {
   rows?: unknown;
+  /**
+   * Agent runs per day, from apps that have them (Eaon Desktop). Optional:
+   * the CLI never sends it, and an upload without it leaves stored runs alone.
+   * `[{ day, tool, runs, totalMs, longestMs }]` — see repo/agents.ts.
+   */
+  agents?: unknown;
   timezone?: unknown;
   scannedAt?: unknown;
   cliVersion?: unknown;
@@ -112,6 +149,13 @@ export interface SyncResult {
    * security.
    */
   rejected?: { day: string; model: string; reason: string; detail: string }[];
+  /** Present when the upload carried `agents`. */
+  agents?: { accepted: number; rejected?: AgentRejection[] };
+  /**
+   * The person's page on the Eaon Desktop board, once they have any Eaon
+   * usage. Absent otherwise, so the app can tell "not yet" from a link.
+   */
+  eaonProfileUrl?: string;
 }
 
 /**
@@ -164,6 +208,12 @@ export async function cliSync(
   if (body.rows.length > MAX_ROWS) {
     return fail(400, `too many rows in one request (max ${MAX_ROWS})`);
   }
+  if (body.agents !== undefined && body.agents !== null) {
+    if (!Array.isArray(body.agents)) return fail(400, "agents must be an array");
+    if (body.agents.length > MAX_AGENT_ENTRIES) {
+      return fail(400, `too many agent entries in one request (max ${MAX_AGENT_ENTRIES})`);
+    }
+  }
 
   const normalized: SyncRow[] = [];
   for (const candidate of body.rows) {
@@ -190,6 +240,8 @@ export async function cliSync(
   const rows = checked.rows;
   await upsertUsage(auth.profile.$id, rows);
 
+  const agents = Array.isArray(body.agents) ? await storeAgents(auth.profile.$id, body.agents) : undefined;
+
   const cliVersion = typeof body.cliVersion === "string" ? body.cliVersion : undefined;
   // An app's row keeps its `<client_id>/` prefix, or the account page would
   // stop knowing which app it is after the first sync.
@@ -197,8 +249,9 @@ export async function cliSync(
 
   // The rollup is what the leaderboard reads, so it has to be refreshed before
   // we can report a rank.
-  await refreshTotals(auth.profile.$id);
+  const summary = await refreshTotals(auth.profile.$id);
   const rank = await (options.rankOf ?? ((userId: string) => rankOf(userId)))(auth.profile.$id);
+  const hasEaon = summary.byTool.some((entry) => entry.tool === EAON_TOOL);
 
   return {
     accepted: rows.length,
@@ -208,7 +261,39 @@ export async function cliSync(
     // Must match the app's route, which is /profile/[handle]. The CLI prints
     // this link, so a mismatch hands the user a 404.
     profileUrl: `${ENV.publicUrl.replace(/\/+$/, "")}/profile/${auth.profile.handle}`,
+    agents,
+    eaonProfileUrl: hasEaon ? eaonProfileUrl(auth.profile.handle) : undefined,
   };
+}
+
+/** The usage `tool` Eaon Desktop reports under. */
+export const EAON_TOOL = "eaon";
+
+/** `https://tokns.eaon.dev/@ada` — the short form the Eaon host serves. */
+export function eaonProfileUrl(handle: string): string {
+  return `${ENV.eaonUrl.replace(/\/+$/, "")}/@${handle}`;
+}
+
+/**
+ * Agent runs are a side table, and losing them must not cost the upload.
+ *
+ * The usage rows are already stored by the time this runs. If `agent_daily`
+ * is not provisioned yet, or a write fails, the sync still succeeds and says
+ * nothing was accepted; the app re-sends its whole history next time, which
+ * heals the gap.
+ */
+async function storeAgents(
+  userId: string,
+  list: unknown[],
+): Promise<{ accepted: number; rejected?: AgentRejection[] }> {
+  const { rows, rejected } = normalizeAgents(list);
+  try {
+    const accepted = await upsertAgents(userId, rows);
+    return { accepted, rejected: rejected.length > 0 ? rejected : undefined };
+  } catch (error) {
+    console.error(`[sync] could not store agent runs for ${userId}:`, error);
+    return { accepted: 0, rejected: rejected.length > 0 ? rejected : undefined };
+  }
 }
 
 /* ------------------------------------------------------------- profile data */

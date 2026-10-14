@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** Copies the profile URL. Falls back silently if the clipboard is blocked. */
-export function ShareButton({ handle }: { handle: string }) {
+export function ShareButton({ handle, path }: { handle: string; path?: string }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -13,7 +13,10 @@ export function ShareButton({ handle }: { handle: string }) {
   }, [copied]);
 
   async function share() {
-    const url = `${window.location.origin}/profile/${handle}`;
+    // `path` for the Eaon profile: `/@handle` on its own host, or its full
+    // address when the page is being read on toknhq.com.
+    const target = path ?? `/profile/${handle}`;
+    const url = /^https?:\/\//.test(target) ? target : `${window.location.origin}${target}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
