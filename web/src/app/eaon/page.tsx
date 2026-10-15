@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
 import { DailyBars, KINDS } from "@/components/eaon/charts";
 import { Group, change, pct, type Row } from "@/components/eaon/parts";
-import { compact, count, duration, money, niceDay } from "@/lib/format";
+import { compact, count, duration, money, niceDay, shortDay } from "@/lib/format";
 import { parsePrefs } from "@/lib/prefs";
 import {
   INDEX_PERIODS,
@@ -23,8 +23,9 @@ import { EAON_URL, TOKN_URL, currentSite, eaonPaths } from "@/lib/sites";
 /**
  * tokns.eaon.dev: the Eaon Desktop leaderboard, and the numbers behind it.
  *
- * One figure (tokens in the period), one sentence and its days; then the
- * board; then the details as plain lists, each appearing only once there is
+ * The board first, as superset.sh/leaderboard has it but quieter: a title,
+ * four totals, what to rank by and the period, then the table. Under it the
+ * stats: the days, then plain lists, each appearing only once there is
  * enough behind it to mean something. A distribution of two people, or
  * records held by the only person here, would be noise.
  */
@@ -76,50 +77,47 @@ export default async function EaonIndexPage({
   const activeDays = index.days.filter((day) => day.tokens > 0).length;
 
   const delta = change(totals.tokens, previous?.tokens);
-  const extras = [
-    totals.runs > 0 ? plural(totals.runs, "agent run") : null,
-    totals.activeToday > 0 ? `${count(totals.activeToday)} active today` : null,
-  ].filter(Boolean);
+  const first = index.days[0]?.day;
+  const last = index.days[index.days.length - 1]?.day;
+  const range = first && last ? `${shortDay(first)} – ${shortDay(last)}` : "";
+  const sortLabel = INDEX_SORTS.find((entry) => entry.key === sort)?.label ?? "Tokens";
 
   return (
     <div className="e-page">
-      <section className="e-hero">
-        <div className="e-hero-top">
-          <p className="e-eyebrow">Eaon Desktop, {PERIOD_WORDS[period]}</p>
-          <nav className="e-tabs" aria-label="Period">
-            {INDEX_PERIODS.map((entry) => (
-              <Link
-                key={entry.key}
-                href={href({ period: entry.key })}
-                aria-current={entry.key === period ? "page" : undefined}
-                scroll={false}
-              >
-                {entry.label}
-              </Link>
-            ))}
-          </nav>
+      <header className="e-title">
+        <div>
+          <h1>Leaderboard</h1>
+          <p>Everyone using Eaon Desktop, by how much they use it.</p>
         </div>
-        <h1 className="e-big">
-          {compact(totals.tokens)}
-          <span className="e-big-unit">tokens</span>
-        </h1>
-        <p className="e-lede">
-          From {plural(totals.users, "developer")} and {plural(totals.requests, "request")}
-          {totals.tokens > 0 && <>, {pct(hit, 0)} of prompts served from cache</>}.
-          {extras.length > 0 && <> {extras.join(", ")}.</>}
-          {delta && (
-            <span className="e-delta">
-              {" "}
-              {delta.text} on the {period === "all" ? "period before" : `${period.replace("d", "")} days before`}
-            </span>
-          )}
-        </p>
-        <DailyBars days={index.days.map((day) => ({ day: day.day, value: day.tokens }))} />
-      </section>
+        <a href={`${TOKN_URL}/account/eaon`} className="e-join">
+          Join the leaderboard <span aria-hidden="true">→</span>
+        </a>
+      </header>
 
-      <section className="e-section" id="board">
-        <header className="e-section-head">
-          <h2>Leaderboard</h2>
+      <dl className="e-totals">
+        <div>
+          <dt>Developers</dt>
+          <dd>{count(totals.users)}</dd>
+        </div>
+        <div>
+          <dt>Tokens</dt>
+          <dd>
+            {compact(totals.tokens)}
+            {delta && <span className="e-delta">{delta.text}</span>}
+          </dd>
+        </div>
+        <div>
+          <dt>Spend</dt>
+          <dd>{money(totals.cost, totals.cost < 100 ? 2 : 0)}</dd>
+        </div>
+        <div>
+          <dt>Cache read</dt>
+          <dd>{totals.tokens > 0 ? pct(hit, 0) : "—"}</dd>
+        </div>
+      </dl>
+
+      <section className="e-section" id="board" aria-label="Leaderboard">
+        <div className="e-controls">
           <nav className="e-tabs" aria-label="Rank by">
             {INDEX_SORTS.map((entry) => (
               <Link
@@ -132,29 +130,58 @@ export default async function EaonIndexPage({
               </Link>
             ))}
           </nav>
-        </header>
+          <div className="e-controls-end">
+            <nav className="e-tabs" aria-label="Period">
+              {INDEX_PERIODS.map((entry) => (
+                <Link
+                  key={entry.key}
+                  href={href({ period: entry.key }, "#board")}
+                  aria-current={entry.key === period ? "page" : undefined}
+                  scroll={false}
+                >
+                  {entry.label}
+                </Link>
+              ))}
+            </nav>
+            {range && period !== "all" && <span className="e-range">{range}</span>}
+          </div>
+        </div>
         {index.entries.length === 0 ? (
           <p className="e-empty">Nobody has synced Eaon Desktop usage in this period yet.</p>
         ) : (
-          <ol className="e-board">
-            {index.entries.slice(0, 100).map((entry) => (
-              <BoardRow
-                key={entry.userId}
-                entry={entry}
-                href={paths.profile(entry.handle)}
-                total={totals.tokens}
-                sort={sort}
-              />
-            ))}
-          </ol>
+          <table className="e-table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Developer</th>
+                <th scope="col" className="e-col-mid">
+                  {sort === "tokens" ? "Requests" : "Tokens"}
+                </th>
+                <th scope="col">{sortLabel}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {index.entries.slice(0, 100).map((entry) => (
+                <BoardRow
+                  key={entry.userId}
+                  entry={entry}
+                  href={paths.profile(entry.handle)}
+                  sort={sort}
+                />
+              ))}
+            </tbody>
+          </table>
         )}
-        <p className="e-note">
-          Using Eaon Desktop? <a href={`${TOKN_URL}/account/eaon`}>Sign in with Tokn</a> in the app
-          and you’ll show up here within the hour.
-        </p>
       </section>
 
-      <Details index={index} activeDays={activeDays} profile={paths.profile} />
+      <section className="e-section" id="stats">
+        <header className="e-section-head">
+          <h2>Stats</h2>
+          <span className="e-section-note">Eaon Desktop, {PERIOD_WORDS[period]}</span>
+        </header>
+        <DailyBars days={index.days.map((day) => ({ day: day.day, value: day.tokens }))} />
+        <Details index={index} activeDays={activeDays} profile={paths.profile} />
+      </section>
     </div>
   );
 }
@@ -174,41 +201,24 @@ function sortValue(entry: IndexEntry, sort: IndexSort): { value: string; unit: s
   }
 }
 
-function BoardRow({
-  entry,
-  href,
-  total,
-  sort,
-}: {
-  entry: IndexEntry;
-  href: string;
-  total: number;
-  sort: IndexSort;
-}) {
+function BoardRow({ entry, href, sort }: { entry: IndexEntry; href: string; sort: IndexSort }) {
   const prefs = parsePrefs(entry.prefs);
   const main = sortValue(entry, sort);
-  const facts = [
-    `@${entry.handle}`,
-    entry.topModel,
-    entry.streak > 1 ? `${entry.streak}-day streak` : null,
-  ].filter(Boolean);
   return (
-    <li>
-      <Link href={href} className="e-row">
-        <span className="e-row-rank">{entry.rank}</span>
-        <Avatar handle={entry.handle} size={32} style={prefs.avatar} url={entry.avatarUrl} />
-        <span className="e-row-names">
-          <span className="e-row-name">{entry.name?.trim() || entry.handle}</span>
-          <span className="e-row-facts">{facts.join(" · ")}</span>
-        </span>
-        <span className="e-row-value">
-          {main.value}
-          <span>
-            {sort === "tokens" && total > 0 ? pct(entry.tokens / total, 0) : main.unit}
+    <tr>
+      <td className="e-col-rank">{entry.rank}</td>
+      <td>
+        <Link href={href} className="e-who">
+          <Avatar handle={entry.handle} size={32} style={prefs.avatar} url={entry.avatarUrl} />
+          <span className="e-who-names">
+            <span className="e-who-name">{entry.name?.trim() || entry.handle}</span>
+            <span className="e-who-handle">@{entry.handle}</span>
           </span>
-        </span>
-      </Link>
-    </li>
+        </Link>
+      </td>
+      <td className="e-col-mid">{sort === "tokens" ? compact(entry.requests) : compact(entry.tokens)}</td>
+      <td className="e-col-value">{main.value}</td>
+    </tr>
   );
 }
 
@@ -307,18 +317,13 @@ function Details({
       : [];
 
   return (
-    <section className="e-section" id="details">
-      <header className="e-section-head">
-        <h2>Details</h2>
-      </header>
-      <div className="e-groups">
-        <Group title="Tokens" rows={kinds} />
-        <Group title="Models" rows={models} />
-        <Group title="Agents" rows={agents} />
-        <Group title="The week" rows={week} />
-        <Group title="Spread" note="Tokens per developer" rows={spread} />
-        <Group title="Records" note="All time" rows={records} />
-      </div>
-    </section>
+    <div className="e-groups">
+      <Group title="Tokens" rows={kinds} />
+      <Group title="Models" rows={models} />
+      <Group title="Agents" rows={agents} />
+      <Group title="The week" rows={week} />
+      <Group title="Spread" note="Tokens per developer" rows={spread} />
+      <Group title="Records" note="All time" rows={records} />
+    </div>
   );
 }
