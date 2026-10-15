@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 /**
- * The frame around every page on tokns.eaon.dev: Eaon's mark, a quiet
- * header and footer, always dark. Tokn shows up only as where the numbers
- * come from and where to sign in.
+ * The frame around every page on tokns.eaon.dev: Eaon's mark, a header of
+ * two text links, a one-line footer. Light or dark with the system. Tokn
+ * shows up only as where the numbers come from and where to sign in.
  */
 
 /** Eaon's mark (resources/brand/eaon-symbol.svg in Eaon Desktop). */
@@ -24,15 +24,12 @@ export function EaonHeader({ toknUrl, boardHref }: { toknUrl: string; boardHref:
     <header className="e-header">
       <div className="e-wrap e-header-inner">
         <Link href={boardHref} className="e-brand" aria-label="Eaon Desktop leaderboard, home">
-          <EaonSymbol size={20} />
+          <EaonSymbol size={18} />
           <span>Eaon</span>
-          <span className="e-brand-sub">Leaderboard</span>
         </Link>
-        <nav className="e-nav" aria-label="Sections">
-          <a href="https://eaon.dev">Download Eaon</a>
-          <a href={`${toknUrl}/account/eaon`} className="e-nav-signin">
-            Sign in
-          </a>
+        <nav className="e-nav" aria-label="Site">
+          <a href="https://eaon.dev">Download</a>
+          <a href={`${toknUrl}/account/eaon`}>Sign in</a>
         </nav>
       </div>
     </header>
@@ -43,12 +40,9 @@ export function EaonFooter({ toknUrl }: { toknUrl: string }) {
   return (
     <footer className="e-footer">
       <div className="e-wrap e-footer-inner">
-        <span className="e-footer-brand">
-          <EaonSymbol size={14} /> Eaon
-        </span>
         <span>
-          Usage is counted on each computer by Eaon Desktop and synced through{" "}
-          <a href={toknUrl}>Tokn</a>: daily totals only, never prompts or code.
+          Counted on each computer by Eaon Desktop and synced through <a href={toknUrl}>Tokn</a>.
+          Daily totals only, never prompts or code.
         </span>
         <nav className="e-footer-links" aria-label="Legal">
           <a href={`${toknUrl}/privacy`}>Privacy</a>

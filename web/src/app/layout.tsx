@@ -96,8 +96,9 @@ export default async function RootLayout({
       </head>
       <body>
         {site === "eaon" ? (
-          // tokns.eaon.dev is Eaon's own site: its frame, its colours, always
-          // dark (app/eaon/eaon.css). tokn's themes and chrome stop here.
+          // tokns.eaon.dev is Eaon's own site: its frame and its colours, light
+          // or dark with the system (app/eaon/eaon.css). tokn's themes and
+          // chrome stop here.
           <div className="eaon-site">
             <EaonHeader toknUrl={TOKN_URL} boardHref="/" />
             <main className="e-wrap">{children}</main>
