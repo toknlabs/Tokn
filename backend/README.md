@@ -1,17 +1,22 @@
 # tokn backend
 
-Appwrite-backed persistence and API logic for the leaderboard.
+Supabase-backed persistence and API logic for the leaderboard.
 
-Everything lives in its **own Appwrite database** (`tokn`), separate from the
-`eaon` database in the same project, so the leaderboard's tables cannot collide
-with anything else and can be backed up or dropped as a unit.
+Everything lives in its **own Postgres schema** (`tokn`), separate from the
+`eaon` schema in the same Supabase project, so the leaderboard's tables cannot
+collide with anything else and can be backed up or dropped as a unit.
+
+The repositories were written against Appwrite, and the tables keep that shape
+(same names, `id` holding the old `$id`). `src/client.ts` answers the Appwrite
+document calls the repositories make by translating each into one request to
+Supabase's Data API, so the move to Postgres did not touch a repository.
 
 ```bash
-cp ../.env.example ../.env     # fill in APPWRITE_API_KEY
+cp ../.env.example ../.env     # fill in SUPABASE_URL and SUPABASE_SECRET_KEY
 npm install
-npm run provision              # create database, collections, indexes
+npm run provision > schema.sql # SQL for the Supabase SQL editor; only adds what is missing
 npm run seed:pricing           # load ~700 model rates
-npm run verify                 # end-to-end check against live Appwrite
+npm run verify                 # end-to-end check against the live database
 npm run dev                    # standalone API on :8787
 ```
 
@@ -31,7 +36,7 @@ npm run dev                    # standalone API on :8787
                      |
                   repo/*             one module per collection
                      |
-                 Appwrite            database "tokn"
+      Supabase Data API      schema "tokn"
 ```
 
 Route handlers stay thin: parse, call a service function, serialise. The
@@ -172,10 +177,9 @@ Field names change from snake_case to camelCase (`user_id` → `userId`,
 
 | Variable | Purpose |
 |---|---|
-| `APPWRITE_ENDPOINT` | `https://sfo.cloud.appwrite.io/v1` |
-| `APPWRITE_PROJECT_ID` | `eaon` |
-| `APPWRITE_API_KEY` | **Server-side only.** Needs Databases read/write. |
-| `TOKN_DATABASE_ID` | `tokn` |
+| `SUPABASE_URL` | `https://<project-ref>.supabase.co` |
+| `SUPABASE_SECRET_KEY` | **Server-side only.** A secret key; it bypasses row-level security. |
+| `TOKN_SCHEMA` | `tokn`. Must be an exposed schema in the Data API settings. |
 | `TOKN_PUBLIC_URL` | Origin used to build profile links returned to the CLI |
 | `CRON_SECRET` | Bearer token for `GET /api/cron/refresh-pricing`. Required in production. |
 
@@ -185,10 +189,10 @@ Locally these are read from the repo-root `.env`, which is gitignored.
 
 | Command | What it does |
 |---|---|
-| `npm run provision` | Create anything missing. Idempotent — safe to re-run. |
+| `npm run provision` | Print the schema SQL for the Supabase SQL editor. Idempotent — safe to re-run. |
 | `npm run seed:pricing` | Refresh model rates from models.dev via `pricing/catalog.ts`. |
 | `npm test` | Catalog builder, refresh plan, and integrity pricing. |
-| `npm run verify` | 29 end-to-end checks against live Appwrite; cleans up after itself. |
+| `npm run verify` | 29 end-to-end checks against the live database; cleans up after itself. |
 | `npm run dev` | Standalone API server on :8787. |
 | `npm run typecheck` | `tsc --noEmit`. |
 

@@ -51,7 +51,7 @@ between a useful number and a wrong one.
 |---|---|
 | `cli/` | the command line tool — scanning, pricing, sync, terminal dashboard |
 | `web/` | the site: leaderboard, profiles, friends, stats |
-| `backend/` | data access and service layer, on Appwrite |
+| `backend/` | data access and service layer, on Supabase Postgres |
 | `pricing/` | shared models.dev catalog builder for the CLI fallback and the server table |
 
 Each has its own README covering how it works and why.
@@ -59,7 +59,7 @@ Each has its own README covering how it works and why.
 ## Development
 
 ```bash
-cp .env.example .env     # fill in Appwrite and GitHub OAuth credentials
+cp .env.example .env     # fill in Supabase and GitHub OAuth credentials
 cd web && npm install && npm run dev
 cd cli && npm install && npm run build && npm link
 ```
