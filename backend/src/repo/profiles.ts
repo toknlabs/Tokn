@@ -106,6 +106,26 @@ export async function findProfileById(userId: string): Promise<Profile | null> {
   }
 }
 
+/** Appwrite takes at most 100 values in one `equal`. */
+const IDS_PER_QUERY = 100;
+
+/** Several profiles at once, in as few reads as the ids allow. Ids with no profile are left out. */
+export async function findProfilesByIds(userIds: readonly string[]): Promise<Profile[]> {
+  const unique = [...new Set(userIds)];
+  const out: Profile[] = [];
+
+  for (let start = 0; start < unique.length; start += IDS_PER_QUERY) {
+    const chunk = unique.slice(start, start + IDS_PER_QUERY);
+    const page = await db().listDocuments(DB_ID, "profiles", [
+      Query.equal("$id", chunk),
+      Query.limit(chunk.length),
+    ]);
+    out.push(...(page.documents as unknown as Profile[]));
+  }
+
+  return out;
+}
+
 export async function findProfileByHandle(handle: string): Promise<Profile | null> {
   const result = await db().listDocuments(DB_ID, "profiles", [
     Query.equal("handleLower", handle.toLowerCase()),

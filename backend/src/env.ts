@@ -63,4 +63,21 @@ export const ENV = {
    * web app's middleware serves the Eaon pages when a request arrives on it.
    */
   eaonUrl: process.env.TOKN_EAON_URL ?? "https://tokns.eaon.dev",
+  /** Who may open the owner pages. See `parseOwnerIds`. */
+  get ownerIds(): string[] {
+    return parseOwnerIds(process.env.TOKN_OWNER_IDS);
+  },
 };
+
+/**
+ * `TOKN_OWNER_IDS`: the profile ids, comma-separated, of the people who run
+ * the site. Ids rather than handles: a handle can be changed and the old one
+ * taken by someone else, and that someone must not inherit the owner pages.
+ * Unset means nobody, so a deployment without it shows them to no one.
+ */
+export function parseOwnerIds(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+}

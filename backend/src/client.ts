@@ -42,6 +42,7 @@ export const Query = {
     q({ method: "greaterThanEqual", attribute, values: wrap(value) }),
   isNull: (attribute: string) => q({ method: "isNull", attribute }),
   isNotNull: (attribute: string) => q({ method: "isNotNull", attribute }),
+  startsWith: (attribute: string, prefix: string) => q({ method: "startsWith", attribute, values: [prefix] }),
   orderAsc: (attribute: string) => q({ method: "orderAsc", attribute }),
   orderDesc: (attribute: string) => q({ method: "orderDesc", attribute }),
   limit: (limit: number) => q({ method: "limit", values: [limit] }),
@@ -88,6 +89,8 @@ function condition(query: Q): string {
   const { method, attribute = "", values = [] } = query;
   if (method === "isNull") return `${ident(attribute)}.is.null`;
   if (method === "isNotNull") return `${ident(attribute)}.not.is.null`;
+  // LIKE, with the prefix's own wildcards taken literally; PostgREST reads `*` as `%`.
+  if (method === "startsWith") return `${ident(attribute)}.like.${lit(`${String(values[0]).replace(/[\\%_]/g, "\\$&")}*`)}`;
   if (method === "or" || method === "and") return `${method}(${(values as Q[]).map(condition).join(",")})`;
   const op = OPS[method];
   if (!op) throw new Error(`Query.${method} is not supported on Postgres`);
