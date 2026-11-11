@@ -2,7 +2,11 @@
 
 An OAuth 2.0 authorization server for desktop apps, so an app can sign someone
 in with their tokn account and upload usage for them. The first client is Eaon
-Desktop, whose Settings → Usage page uses it.
+Desktop, whose Settings → Usage page uses it. Orca (`client_id=orca`, loopback
+path `/tokn/callback`) uses it from Settings → Stats → Publish usage, and
+uploads its tracked Claude Code and Codex totals under the same `claude-code`
+and `codex` tools the CLI uses, so the two upsert the same rows rather than
+double-counting.
 
 ## The flow
 
