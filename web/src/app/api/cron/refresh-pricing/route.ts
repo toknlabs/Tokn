@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
-import { refreshPricingFromCatalog } from "@/lib/backend";
+import { clearLogoCache, refreshPricingFromCatalog } from "@/lib/backend";
 
 /**
  * GET /api/cron/refresh-pricing — rebuild the Appwrite price table.
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
 
   try {
     const result = await refreshPricingFromCatalog({ force: true });
+    clearLogoCache();
+    revalidateTag("model-logos");
     return NextResponse.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "pricing refresh failed";

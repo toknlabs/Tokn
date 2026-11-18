@@ -14,6 +14,7 @@ import {
 } from "./repo/profiles.ts";
 import { refreshTotals, rankOf, getTotals } from "./repo/leaderboard.ts";
 import { assess } from "./repo/integrity.ts";
+import { priceNewModels } from "./refresh-pricing.ts";
 import { listUsage, normalizeRow, summarize, upsertUsage, type SyncRow } from "./repo/usage.ts";
 import {
   MAX_AGENT_ENTRIES,
@@ -156,6 +157,11 @@ export interface SyncResult {
    * usage. Absent otherwise, so the app can tell "not yet" from a link.
    */
   eaonProfileUrl?: string;
+  /**
+   * Models this upload brought that had no price, and that a fresh look at
+   * models.dev priced on the spot. The CLI's saved table predates them.
+   */
+  newlyPriced?: string[];
 }
 
 /**
@@ -223,8 +229,19 @@ export async function cliSync(
 
   // Shape first, then plausibility and pricing. `assess` replaces every
   // costUsd with the server's own figure, so nothing the client claimed about
-  // money survives this line.
-  const checked = await assess(normalized);
+  // money survives this line. It also needs what is already stored, to judge
+  // each day whole rather than only the rows that arrived.
+  const stored = await listUsage(auth.profile.$id);
+  let checked = await assess(normalized, { stored });
+
+  // A model the table cannot price may just be newer than the table. Ask
+  // models.dev once, and judge the upload again if that priced anything, so
+  // the first person to use a new model is counted on the day it ships.
+  const unpriced = new Set(
+    checked.rejected.filter((r) => r.reason === "unpriceable-model").map((r) => r.model),
+  );
+  const newlyPriced = await priceNewModels([...unpriced]);
+  if (newlyPriced.length > 0) checked = await assess(normalized, { stored });
   if (checked.overSyncLimit) {
     return fail(413, "that upload claims more tokens than a machine could produce");
   }
@@ -257,6 +274,7 @@ export async function cliSync(
     accepted: rows.length,
     skipped: body.rows.length - rows.length,
     rejected: checked.rejected.length > 0 ? checked.rejected : undefined,
+    newlyPriced: newlyPriced.length > 0 ? newlyPriced : undefined,
     rank: rank ?? undefined,
     // Must match the app's route, which is /profile/[handle]. The CLI prints
     // this link, so a mismatch hands the user a 404.

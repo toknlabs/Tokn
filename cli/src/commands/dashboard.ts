@@ -1,4 +1,5 @@
 import { loadConfig, resolveToken } from "../core/config.js";
+import { currentPricing } from "../core/pricing-refresh.js";
 import { NoSessionsError, runScan, toolName } from "../core/run-scan.js";
 import { totalTokens } from "../core/pricing.js";
 import { unreadable } from "../core/sources/registry.js";
@@ -26,7 +27,7 @@ export async function dashboardCommand(args: ParsedArgs): Promise<number> {
   try {
     result = await runScan({
       since: resolveSince(args),
-      pricing: config.pricing?.models,
+      pricing: await currentPricing(config),
     });
   } catch (error) {
     if (error instanceof NoSessionsError) {

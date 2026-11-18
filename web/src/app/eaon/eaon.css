@@ -551,7 +551,7 @@ main.e-wrap {
   color: var(--e-text);
 }
 
-.e-list dt > span {
+.e-list dt > span:not(.brand-item) {
   font-size: 0.8125rem;
   color: var(--e-faint);
 }

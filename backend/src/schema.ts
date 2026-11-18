@@ -88,9 +88,14 @@ export const COLLECTIONS: Collection[] = [
       // name can be changed by its owner, so it must never be the join key.
       { key: "githubId", type: "string", size: 32 },
       { key: "githubLogin", type: "string", size: 64 },
+      // Demo data, so it can be found and removed in one pass. Nothing reads
+      // this at runtime — it exists purely so seeded accounts never become
+      // indistinguishable from real ones once people start signing up.
+      { key: "seeded", type: "boolean", default: false },
     ],
     indexes: [
       { key: "handleLower_unique", type: "unique", attributes: ["handleLower"] },
+      { key: "seeded_idx", type: "key", attributes: ["seeded"] },
       { key: "createdAt_idx", type: "key", attributes: ["createdAt"], orders: ["DESC"] },
       { key: "githubId_idx", type: "key", attributes: ["githubId"] },
     ],

@@ -30,14 +30,57 @@ export const PRICING: Record<string, ModelPrice> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
 };
 
-/** Short label for a model id, for tables and legends. */
+/**
+ * Families whose capitalisation is not just "first letter upper".
+ *
+ * Everything else title-cases fine on its own; these are the acronyms and
+ * intercaps that would otherwise read as "Gpt" and "Deepseek".
+ */
+const FAMILIES: Record<string, string> = {
+  gpt: "GPT",
+  glm: "GLM",
+  deepseek: "DeepSeek",
+  qwen: "Qwen",
+  qwen2: "Qwen2",
+  qwen3: "Qwen3",
+  llama: "Llama",
+  gemini: "Gemini",
+  kimi: "Kimi",
+  grok: "Grok",
+  mistral: "Mistral",
+  codestral: "Codestral",
+  phi: "Phi",
+  nova: "Nova",
+  command: "Command",
+};
+
+const upperFirst = (word: string): string => word.charAt(0).toUpperCase() + word.slice(1);
+
+/** "5.6", "3", "4o", "v4" — a version, not a word, so it is left alone. */
+const isVersion = (part: string): boolean => /^v?\d/.test(part);
+
+/**
+ * Short label for a model id, for tables and legends.
+ *
+ * Anthropic ids are hyphen-separated digits — `claude-haiku-4-5` means 4.5 —
+ * so those segments join with dots. No other provider names models that way:
+ * `gpt-6-astra` and `deepseek-v4-flash` are words, and joining them with dots
+ * produces "Gpt 6.astra". They join with spaces instead.
+ */
 export function modelLabel(model: string): string {
-  const known = model.replace(/^claude-/, "");
-  const parts = known.split("-");
-  const family = parts.shift() ?? known;
-  const version = parts.join(".");
-  const name = family.charAt(0).toUpperCase() + family.slice(1);
-  return version ? `${name} ${version}` : name;
+  const parts = model.split("-");
+
+  if (parts[0] === "claude") {
+    parts.shift();
+    const family = parts.shift() ?? model;
+    const version = parts.join(".");
+    return version ? `${upperFirst(family)} ${version}` : upperFirst(family);
+  }
+
+  const family = parts.shift() ?? model;
+  const name = FAMILIES[family.toLowerCase()] ?? upperFirst(family);
+  const rest = parts.map((part) => (isVersion(part) ? part : upperFirst(part)));
+  return [name, ...rest].join(" ");
 }
 
 /**

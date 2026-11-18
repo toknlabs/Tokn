@@ -247,6 +247,15 @@ export async function saveProfile(
   profilesChanged();
 }
 
+/**
+ * Save only the appearance blob. `saveProfile` writes every field and would
+ * blank the ones a layout edit on the profile page never sent.
+ */
+export async function savePrefs(userId: string, prefs: string | null): Promise<void> {
+  await updateProfile(userId, { prefs });
+  profilesChanged();
+}
+
 /* --------------------------------------------------------------- sessions */
 
 export async function createSession(userId: string): Promise<{ id: string; expiresAt: Date }> {

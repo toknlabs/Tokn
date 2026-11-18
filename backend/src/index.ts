@@ -41,6 +41,15 @@ export {
   pricingTableForCli,
   refreshPricingFromCatalog,
 } from "./refresh-pricing.ts";
+export {
+  clearLogoCache,
+  createLogoResolver,
+  getDynamicModelLogoSvg,
+  resolveDynamicModelLogos,
+  type LogoLookupIo,
+  type ResolvedModelLogo,
+  type ResolveLogosOptions,
+} from "./refresh-logos.ts";
 export * from "./service.ts";
 export * from "./passkey-service.ts";
 export * from "./return-path.ts";

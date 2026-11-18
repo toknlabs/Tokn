@@ -239,8 +239,21 @@ the total cannot silently understate. Where a tool computed its own cost
 (opencode does), that is used as a fallback for models we cannot price.
 
 `tokn sync` refreshes the table from the dashboard first, so a model released
-after this CLI shipped is still priced correctly. Regenerate the built-in table
-with `npm run pricing`.
+after this CLI shipped is still priced correctly. Since 0.1.4, `tokn scan` and
+`tokn dashboard` do too (`core/pricing-refresh.ts`). They use the saved table
+while it is under 24 hours old. Otherwise they fetch `GET /api/cli/pricing`
+with a 3 second timeout and no token, so this works on a machine that was never
+linked. If that fails they fall back to the saved table, then the bundled one.
+
+When a sync brings a model the server could not price, the server checks
+models.dev on the spot. If the model is now listed, the response names it in
+`newlyPriced`, and `tokn sync` (and autosync) refetch the table before saving
+and print `New model(s) priced from models.dev: …`.
+
+Local reports merge the two spellings of a Claude model (`claude-opus-5.5` and
+`claude-opus-5-5`) into one line. Uploaded rows keep the id the tool wrote.
+
+Regenerate the built-in table with `npm run pricing`.
 
 **Known limitation:** context-tiered pricing (some models charge double above
 200K context) is not applied — per-request context size is not reliably
@@ -311,8 +324,18 @@ Bearer token.
   "cliVersion": "0.1.0" }
 
 // 200
-{ "accepted": 137, "rank": 3, "profileUrl": "https://toknhq.com/profile/sanshray" }
+{ "accepted": 137, "rank": 3, "profileUrl": "https://toknhq.com/profile/sanshray",
+  // optional:
+  "rejected": [{ "day": "2026-10-30", "model": "claude-opus-5-5",
+                 "reason": "output-per-day", "detail": "500,000,000 output tokens across the day" }],
+  "newlyPriced": ["some-new-model"] }
 ```
+
+`rejected` lists rows the server refused; the rest of the upload still counts.
+A day over a per-account ceiling (`tokens-per-day`, `output-per-day`,
+`cost-per-day`) refuses every row sent for that day, and the CLI prints it once
+as "every model" rather than once per row. An upload claiming more than 200B
+tokens in total is refused whole with a 413.
 
 **Rows must upsert on `(user, day, tool, model, fast)` — never append.** The CLI
 is stateless and re-sends the full history on every sync, so replacing a row is

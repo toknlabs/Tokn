@@ -1,5 +1,6 @@
 import { db, DB_ID, Query } from "../client.ts";
 import { usageRowId } from "../ids.ts";
+import { normalizeModelId } from "../../../pricing/catalog.ts";
 
 /**
  * Usage storage — the heart of the backend.
@@ -283,6 +284,26 @@ export interface UsageSummary {
 const tokensOf = (row: SyncRow): number =>
   row.input + row.output + row.cacheWrite5m + row.cacheWrite1h + row.cacheRead;
 
+/**
+ * One id per model, for grouping usage on a page.
+ *
+ * The same model arrives spelled several ways: Claude Code writes
+ * `claude-opus-5-5`, Copilot and OpenRouter write `claude-opus-5.5`, Bedrock
+ * adds region prefixes, some logs keep the dated snapshot. Grouped as raw
+ * strings, one model shows up as two lines with the same label.
+ *
+ * Display only. A stored row keeps the id it arrived with, because its row id
+ * is derived from it: rewriting it would orphan every existing row, and the
+ * next sync would count them twice.
+ */
+export function canonicalModelId(model: string): string {
+  const id = normalizeModelId(model);
+  // Only Claude ids are folded. Anthropic's own spelling is hyphens, so a
+  // dotted Claude id is always someone's rewrite of it. Elsewhere the dot is
+  // the vendor's own (`gpt-5.2`) and a hyphen could mean something else.
+  return id.startsWith("claude-") ? id.replace(/\./g, "-") : id;
+}
+
 /** Roll a user's raw rows into the shape both the profile page and the totals table need. */
 export function summarize(rows: UsageDoc[]): UsageSummary {
   const days = new Map<string, { costUsd: number; tokens: number; requests: number }>();
@@ -314,7 +335,7 @@ export function summarize(rows: UsageDoc[]): UsageSummary {
     cacheRead += row.cacheRead;
     cacheWrite += row.cacheWrite5m + row.cacheWrite1h;
     bump(days, row.day, row);
-    bump(models, row.model, row);
+    bump(models, canonicalModelId(row.model), row);
     bump(tools, row.tool, row);
   }
 

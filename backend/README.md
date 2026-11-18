@@ -85,6 +85,125 @@ would collide and silently overwrite each other. Rows uploaded by an older CLI
 that predates the tool dimension are attributed to `claude-code` rather than
 rejected.
 
+### Model ids are grouped, not rewritten
+
+The same model arrives spelled several ways. Claude Code writes
+`claude-opus-5-5`, Copilot and OpenRouter write `claude-opus-5.5`, Bedrock adds
+`us.anthropic.` and a `-v1:0`, and some logs keep the dated snapshot. Grouped as
+raw strings, one model showed up on a profile as two lines with the same label.
+
+`canonicalModelId()` in `src/repo/usage.ts` folds them for display. It runs
+`normalizeModelId` from `pricing/catalog.ts` (lowercase; strip region prefixes,
+`anthropic.` and `vendor/` prefixes, `-vN[:N]`, `@…` and `-YYYYMMDD`). Then, for
+`claude-` ids only, it turns dots into hyphens. Anthropic's own spelling is
+hyphens, but elsewhere a dot is the vendor's (`gpt-5.2`). It is applied
+wherever usage is grouped by model: `summarize()` here, and `lib/stats.ts` and
+`lib/site-stats.ts` in the web app.
+
+**Stored rows keep the id they arrived with.** The row id is derived from it
+(above), so rewriting the stored id would orphan every existing row and the
+next sync would count them twice.
+
+## Integrity
+
+`src/repo/integrity.ts` judges every uploaded row before anything is written.
+Costs are always recomputed from tokens at the server's prices, so the checks
+here are about volumes that no machine could have produced. A row over a
+ceiling is **rejected, never clamped**. The sync still answers 200 and lists
+what it refused in `rejected: [{ day, model, reason, detail }]`, and `costUsd`
+counts only what was accepted.
+
+| Limit (`LIMITS`) | Value | Scope | Reason code |
+|---|---|---|---|
+| `tokensPerRequest` | 20M | one row, all tokens ÷ requests | `tokens-per-request` |
+| `outputPerRequest` | 1M | one row, output ÷ requests | `output-per-request` |
+| `requestsPerRow` | 250,000 | one row | `requests-per-row` |
+| `outputPerDay` | 50M | one account's day | `output-per-day` |
+| `tokensPerDay` | 20B | one account's day, all five token kinds | `tokens-per-day` |
+| `costPerDayUsd` | $5,000 | one account's day, at server prices | `cost-per-day` |
+| `tokensPerSync` | 200B | one whole upload | whole sync refused, HTTP 413 |
+| `maxAgeDays` | 400 | how old a row's day may be | |
+
+**The day ceilings are per account, not per row.** A forgery spread across
+many tools, models or machines on one day still adds up. `overDay()` adds a day's
+uploaded rows to the rows already stored for that day, leaving out any stored
+bucket this sync overwrites. If the sum breaks a ceiling, every row this sync
+sent for that day is rejected with the same reason. Other days go through.
+`cliSync` passes the stored rows in (`assess(rows, { prices, stored })`).
+
+The real heaviest day on record (2026-10-30) was 1.6B tokens, 7.0M output and
+$645. The ceilings sit well above that, so a genuine heavy user is not near
+them. They exist because a forged row of 501M output tokens and $10,000 in one
+day was accepted before them. The tests in `test/integrity.test.ts` include
+that forgery, a forged day split across buckets, stored rows counting towards
+the day, and the real peak passing.
+
+### Cleaning up rows stored before a ceiling existed
+
+```
+npm run audit:usage             list offending rows, change nothing
+npm run audit:usage -- --apply  delete them and refresh the owners' totals
+```
+
+`src/audit-usage.ts` reads every `usage_daily` row and flags a row if it fails
+the per-row checks, or if it breaks a day ceiling **on its own**. Days that are
+over a ceiling only in sum are printed as "left alone, look at these by hand"
+and never deleted, because which of several rows is the forged one is a
+judgement call. `--apply` deletes flagged rows by id, then clears the usage
+cache and refreshes totals for every affected account. The board picks it up at
+the top of the next hour. It needs `SUPABASE_URL` and `SUPABASE_SECRET_KEY`
+(the repo-root `.env` has them, and they point at production). Always run it
+without `--apply` first.
+
+## Demo accounts
+
+> **Do not run this against production.** The 70 demo accounts were removed
+> from production on 2026-10-01 at the owner's request. The repo-root `.env`
+> now points at the production database, so `npm run seed:demo` from a
+> checkout puts them straight back on the live board.
+
+```
+npm run seed:demo             add 70 accounts with usage, machines and friends
+npm run seed:demo -- --remove take them all away again
+```
+
+Every row it writes carries `seeded: true` on the profile, which is the only
+reason that column exists. Nothing reads it at runtime; it is there so demo
+data stays findable once real people sign up. `--remove` finds accounts by that
+flag and deletes their usage, devices, friendships, totals and profile —
+**real accounts are never touched**, so it is safe to run against a live
+database.
+
+The generator is in `src/seed-demo.ts`. Three things it does deliberately:
+
+- **Archetypes, not one generator.** `titan` (runs agents in parallel, a small
+  team of one), `whale`, `steady`, `weekend`, `burst`, `ramp`, `taper`,
+  `light`, `new`, `lurker`. Titans carry 1.35–2.15x the context per request on
+  top of their volume, which is most of why their bills are an order of
+  magnitude above the rest and not just a multiple. Each shape has its own day-selection rule, so the
+  activity grids have working weeks, weekends and holidays in them rather than
+  uniform noise.
+- **Rates are read from the `pricing` collection**, not copied into the
+  script. The site prices its what-if comparisons from that collection, so a
+  second table here would drift and a model would cost one thing in its own row
+  and another in the comparison beside it.
+- **Models span providers.** Nobody runs one vendor's catalogue and nothing
+  else. Who picks what is the interesting part: the heaviest accounts sit on
+  frontier models from whoever ships them, hobbyists are on the cheap
+  open-weight ones, and accounts drifting away are still on versions from six
+  months ago. Every id must exist in `pricing`.
+- **A wide spread on cache reuse.** Each account gets a reuse character
+  (0.3–2.4x on cache reads), which puts the cohort between roughly 6:1 and
+  48:1. With one range for everybody the whole cohort lands on the median and
+  the percentile panel says nothing.
+
+Handles are written out rather than assembled: a board where every name is
+adjective-plus-noun is the clearest tell that it is fabricated.
+
+**Profile links are deliberately never set, and display names are never full
+names.** A demo account linking to a real github.com or x.com profile would
+attach a stranger's identity to invented spend.
+
 ## Pricing
 
 Rates are built once, in [`pricing/`](../pricing/README.md). `npm run seed:pricing`
@@ -100,6 +219,14 @@ and nowhere else.
 `GET /api/cli/pricing` serves the Appwrite table. When that table is empty it
 is filled before the response; when it is older than a day a refresh is
 scheduled after the response. The cron does the same rebuild at 06:15 UTC.
+A sync that brings a model with no price does not wait for either: it checks
+models.dev on the spot and rebuilds if the model is now listed (see
+[`pricing/`](../pricing/README.md)). `priceNewModels` in
+`src/refresh-pricing.ts` does the check (an ETag request, at most once per ten
+minutes per instance, and it never throws). If anything got priced, the upload
+is judged again and the response carries `newlyPriced: string[]`. The web sync
+route then revalidates `/api/cli/pricing` and the `model-logos` cache tag, so
+the next CLI price fetch and the next page render both see the model.
 Set `CRON_SECRET` in the deployment environment or the cron route returns 401.
 
 Until this revision is deployed, production still has whatever the last manual
@@ -190,8 +317,11 @@ Locally these are read from the repo-root `.env`, which is gitignored.
 | Command | What it does |
 |---|---|
 | `npm run provision` | Print the schema SQL for the Supabase SQL editor. Idempotent — safe to re-run. |
+| `npm run schema:pg` | The raw Postgres DDL generated from `COLLECTIONS` (`provision` wraps it in the schema). |
 | `npm run seed:pricing` | Refresh model rates from models.dev via `pricing/catalog.ts`. |
-| `npm test` | Catalog builder, refresh plan, and integrity pricing. |
+| `npm run audit:usage` | List stored rows over the integrity ceilings; `-- --apply` deletes them. See [Integrity](#integrity). |
+| `npm run seed:demo` | Demo accounts. **Not on production.** See [Demo accounts](#demo-accounts). |
+| `npm test` | Catalog builder, refresh plan, integrity ceilings and pricing, new-model pricing, logo resolver. |
 | `npm run verify` | 29 end-to-end checks against the live database; cleans up after itself. |
 | `npm run dev` | Standalone API server on :8787. |
 | `npm run typecheck` | `tsc --noEmit`. |
@@ -208,5 +338,7 @@ effect.
   read) but worth pruning on the same schedule.
 - **`globalStats()` pages through every totals row.** Fine to a few thousand
   users; past that, cache it or keep a running counter.
-- **Row-level rate limiting is not implemented.** `MAX_ROWS` (20,000) caps a
-  single upload, but nothing stops a device syncing in a loop.
+- **Rate limiting is per device and coarse.** `MAX_ROWS` (20,000) caps a
+  single upload, and a device syncing again within 10 seconds
+  (`MIN_SYNC_INTERVAL_MS`) gets a 429. Nothing limits a user with many
+  devices.

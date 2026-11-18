@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { ModelName } from "@/components/BrandLogo";
 import { DailyBars, KINDS } from "@/components/eaon/charts";
 import { Group, change, pct, type Row } from "@/components/eaon/parts";
 import { compact, count, duration, money, niceDay, shortDay } from "@/lib/format";
+import { resolveModelLogos } from "@/lib/logos-server";
 import { parsePrefs } from "@/lib/prefs";
 import {
   INDEX_PERIODS,
@@ -233,7 +235,7 @@ function recordText(record: IndexRecord): string {
 
 const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-function Details({
+async function Details({
   index,
   activeDays,
   profile,
@@ -244,6 +246,7 @@ function Details({
 }) {
   const { totals } = index;
   if (totals.tokens <= 0) return null;
+  const logoMap = await resolveModelLogos(index.models.slice(0, 5).map((m) => m.model));
 
   const kinds: Row[] = KINDS.map((kind) => ({
     label: kind.label,
@@ -258,7 +261,7 @@ function Details({
 
   const models: Row[] = index.models.slice(0, 5).map((model) => ({
     key: model.model,
-    label: model.model,
+    label: <ModelName model={model.model} logoMap={logoMap} size={13} />,
     sub: plural(model.users, "developer"),
     value: compact(model.tokens),
   }));

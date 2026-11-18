@@ -62,6 +62,8 @@ export interface Profile {
   createdAt: string;
   githubId?: string | null;
   githubLogin?: string | null;
+  /** Demo data. See `seed-demo.ts`. Never set on a real signup. */
+  seeded?: boolean;
 }
 
 /** What is safe to serialise to a browser or the CLI. */

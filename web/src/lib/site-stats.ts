@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import {
+  canonicalModelId,
   listAllProfiles,
   listAllUsage,
   listedFor,
@@ -178,12 +179,13 @@ async function computeSiteStats(windowDays = 30): Promise<SiteStats> {
 
   for (const row of usage) {
     const tokens = tokensOf(row);
+    const modelId = canonicalModelId(row.model);
 
     allTime.cost += row.costUsd;
     allTime.tokens += tokens;
     allTime.requests += row.requests;
     if (!firstDay || row.day < firstDay) firstDay = row.day;
-    allModels.add(row.model);
+    allModels.add(modelId);
     allDays.add(row.day);
 
     if (row.day < start) continue;
@@ -194,7 +196,7 @@ async function computeSiteStats(windowDays = 30): Promise<SiteStats> {
 
     add(days, row.day, row.costUsd, tokens, row.requests);
 
-    const model = models.get(row.model) ?? {
+    const model = models.get(modelId) ?? {
       cost: 0,
       tokens: 0,
       requests: 0,
@@ -204,7 +206,7 @@ async function computeSiteStats(windowDays = 30): Promise<SiteStats> {
     model.tokens += tokens;
     model.requests += row.requests;
     model.users.add(row.userId);
-    models.set(row.model, model);
+    models.set(modelId, model);
 
     const tool = tools.get(row.tool) ?? {
       cost: 0,
@@ -235,7 +237,7 @@ async function computeSiteStats(windowDays = 30): Promise<SiteStats> {
     user.cost += row.costUsd;
     user.tokens += tokens;
     user.requests += row.requests;
-    user.models.add(row.model);
+    user.models.add(modelId);
     if (row.updatedAt > user.lastSync) user.lastSync = row.updatedAt;
   }
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { friendsLeaderboard, type FriendMetric, type FriendWindow } from "@/lib/backend";
+import { resolveModelLogos } from "@/lib/logos-server";
 
 /** GET /api/friends/board?window=all|30d|7d&metric=cost|tokens|requests */
 
@@ -20,10 +21,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "unknown window or metric" }, { status: 400 });
   }
 
+  const entries = await friendsLeaderboard(user.id, {
+    window: window as FriendWindow,
+    metric: metric as FriendMetric,
+  });
+  const logoMap = await resolveModelLogos(entries.map((entry) => entry.topModel));
   return NextResponse.json({
-    entries: await friendsLeaderboard(user.id, {
-      window: window as FriendWindow,
-      metric: metric as FriendMetric,
-    }),
+    entries: entries.map((entry) => ({
+      ...entry,
+      topModelLogo: entry.topModel ? (logoMap[entry.topModel] ?? null) : null,
+    })),
   });
 }

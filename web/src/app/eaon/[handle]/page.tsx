@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/Avatar";
+import { ModelName } from "@/components/BrandLogo";
 import { ShareButton } from "@/components/ShareButton";
 import { SocialIcon } from "@/components/SocialIcon";
 import { DailyBars, KINDS, YearGrid } from "@/components/eaon/charts";
@@ -11,6 +12,7 @@ import { areFriends } from "@/lib/backend";
 import { eaonPerson, makerOf } from "@/lib/eaon";
 import { compact, count, duration, money, niceDay } from "@/lib/format";
 import { parseLinks } from "@/lib/links";
+import { resolveModelLogos } from "@/lib/logos-server";
 import { parsePrefs } from "@/lib/prefs";
 import { EAON_TOOL, shiftDay, today, userStats } from "@/lib/stats";
 import { EAON_URL, currentSite, eaonPaths, eaonProfileUrl, toknProfileHref } from "@/lib/sites";
@@ -113,15 +115,16 @@ export default async function EaonProfilePage({ params }: { params: Params }) {
     { label: "Per request", value: compact(person.tokensPerRequest) },
     { label: "Spend at API prices", value: money(stats.totals.cost, stats.totals.cost < 100 ? 2 : 0) },
   );
-  const models: Row[] = [...stats.byModel]
+  const topModels = [...stats.byModel]
     .sort((a, b) => b.tokens - a.tokens)
-    .slice(0, 5)
-    .map((model) => ({
-      key: model.model,
-      label: model.model,
-      sub: makerOf(model.model),
-      value: compact(model.tokens),
-    }));
+    .slice(0, 5);
+  const logoMap = await resolveModelLogos(topModels.map((model) => model.model));
+  const models: Row[] = topModels.map((model) => ({
+    key: model.model,
+    label: <ModelName model={model.model} logoMap={logoMap} size={13} />,
+    sub: makerOf(model.model),
+    value: compact(model.tokens),
+  }));
   const agentRows: Row[] =
     agents.runs > 0
       ? [

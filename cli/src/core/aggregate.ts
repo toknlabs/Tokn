@@ -135,16 +135,20 @@ function summarizeByModel(buckets: Bucket[]): ModelSummary[] {
   const map = new Map<string, ModelSummary>();
 
   for (const bucket of buckets) {
-    let entry = map.get(bucket.model);
+    // Claude Code writes `claude-opus-5-5`, Copilot `claude-opus-5.5`: one
+    // model, so one line. Same rule as the website's `canonicalModelId`.
+    // Sync rows keep the original id; the server's row ids are built from it.
+    const model = bucket.model.startsWith("claude-") ? bucket.model.replace(/\./g, "-") : bucket.model;
+    let entry = map.get(model);
     if (!entry) {
       entry = {
-        model: bucket.model,
+        model,
         requests: 0,
         tokens: emptyTokens(),
         cost: { ...ZERO_COST },
         unpriced: false,
       };
-      map.set(bucket.model, entry);
+      map.set(model, entry);
     }
     entry.requests += bucket.requests;
     addTokens(entry.tokens, bucket.tokens);

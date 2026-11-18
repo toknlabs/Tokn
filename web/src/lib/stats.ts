@@ -3,6 +3,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { PROFILES_TAG, USAGE_TAG } from "./board-cache";
 import {
+  canonicalModelId,
   listAgents,
   listAllAgents,
   listAllProfiles,
@@ -246,11 +247,13 @@ export function compactUsage(
   };
 
   for (const row of rows) {
-    let model = modelIndex.get(row.model);
+    // One model reported under two spellings is one model on the page.
+    const id = canonicalModelId(row.model);
+    let model = modelIndex.get(id);
     if (model === undefined) {
       model = models.length;
-      models.push(row.model);
-      modelIndex.set(row.model, model);
+      models.push(id);
+      modelIndex.set(id, model);
     }
 
     fold(row, model);
@@ -910,6 +913,8 @@ export interface DayPoint {
   output: number;
   cacheWrite: number;
   cacheRead: number;
+  /** What the day ran on, most expensive first. */
+  models?: { model: string; cost: number; tokens: number; requests: number }[];
 }
 
 export interface ModelPoint {
@@ -970,6 +975,11 @@ export function statsFromRows(rows: UsageDoc[]): UserStats {
     { tool: string; cost: number; tokens: number; requests: number }
   >();
 
+  const dayModels = new Map<
+    string,
+    Map<string, { model: string; cost: number; tokens: number; requests: number }>
+  >();
+
   for (const row of rows) {
     const day = days.get(row.day) ?? {
       day: row.day,
@@ -990,10 +1000,20 @@ export function statsFromRows(rows: UsageDoc[]): UserStats {
     day.cacheRead += row.cacheRead;
     days.set(row.day, day);
 
+    const id = canonicalModelId(row.model);
+
+    let ran = dayModels.get(row.day);
+    if (!ran) dayModels.set(row.day, (ran = new Map()));
+    const dayModel = ran.get(id) ?? { model: id, cost: 0, tokens: 0, requests: 0 };
+    dayModel.cost += row.costUsd;
+    dayModel.tokens += tokensOf(row);
+    dayModel.requests += row.requests;
+    ran.set(id, dayModel);
+
     const model =
-      models.get(row.model) ??
+      models.get(id) ??
       ({
-        model: row.model,
+        model: id,
         cost: 0,
         tokens: 0,
         requests: 0,
@@ -1009,7 +1029,7 @@ export function statsFromRows(rows: UsageDoc[]): UserStats {
     model.output += row.output;
     model.cacheRead += row.cacheRead;
     model.cacheWrite += row.cacheWrite5m + row.cacheWrite1h;
-    models.set(row.model, model);
+    models.set(id, model);
 
     const tool = tools.get(row.tool) ?? {
       tool: row.tool,
@@ -1024,6 +1044,11 @@ export function statsFromRows(rows: UsageDoc[]): UserStats {
   }
 
   const byDay = [...days.values()].sort((a, b) => a.day.localeCompare(b.day));
+  for (const point of byDay) {
+    point.models = [...(dayModels.get(point.day)?.values() ?? [])].sort(
+      (a, b) => b.cost - a.cost,
+    );
+  }
   const byModel = [...models.values()].sort((a, b) => b.cost - a.cost);
   const byTool = [...tools.values()].sort((a, b) => b.cost - a.cost);
 

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { ShareBars } from "@/components/Charts";
 
@@ -23,7 +24,7 @@ export function PagedBars({
   rows,
   pageSize = 8,
 }: {
-  rows: { label: string; value: number; display: string }[];
+  rows: { key?: string; label: string; value: number; display: string; icon?: ReactNode }[];
   pageSize?: number;
 }) {
   const [page, setPage] = useState(0);

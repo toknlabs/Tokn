@@ -70,9 +70,14 @@ The CLI defaults to `http://localhost:3000`. `TOKN_HOST` points it elsewhere.
 
 The server never stores a number the client chose freely. Costs are recomputed
 from token counts against the server's own price table, and submissions that
-describe something a machine could not have done are rejected. See
+describe something a machine could not have done are rejected. That includes
+ceilings per account per day (output tokens, all tokens, cost), so a forged
+day cannot be spread across many rows to slip under the per-row limits. See
 `backend/src/repo/integrity.ts`, which also documents what this does not
-prevent.
+prevent, and [`backend/README.md`](backend/README.md#integrity) for the
+numbers and the `audit:usage` cleanup script.
+
+Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 
