@@ -29,6 +29,7 @@ import {
   type LinkCode as BackendLinkCode,
   type Profile,
 } from "./backend";
+import { fixtureProfile, fixturesOn } from "./fixtures";
 
 /**
  * Accounts, browser sessions and CLI device tokens — backed by Appwrite.
@@ -184,6 +185,11 @@ export function toPublicUser(row: UserRow): PublicUser {
 /* ------------------------------------------------------------------ users */
 
 export async function findUserByHandle(handle: string): Promise<UserRow | undefined> {
+  // Dev only; see lib/fixtures.ts. Never true in a production build.
+  if (fixturesOn()) {
+    const fixture = fixtureProfile(handle);
+    return fixture ? toUserRow(fixture) : undefined;
+  }
   const profile = await findProfileByHandle(handle);
   return profile ? toUserRow(profile) : undefined;
 }
@@ -238,6 +244,15 @@ export async function saveProfile(
   });
   // Going private or unlisted has to take someone off the board now, not at
   // the next hourly refresh.
+  profilesChanged();
+}
+
+/**
+ * Save only the appearance blob. `saveProfile` writes every field and would
+ * blank the ones a layout edit on the profile page never sent.
+ */
+export async function savePrefs(userId: string, prefs: string | null): Promise<void> {
+  await updateProfile(userId, { prefs });
   profilesChanged();
 }
 

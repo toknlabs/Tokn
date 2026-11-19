@@ -123,6 +123,18 @@ async function syncOnce(
     cliVersion: VERSION,
   });
 
+  // The server priced a model it met in this upload; the table fetched above
+  // predates that. Saving it as is would leave `tokn scan` pricing that model
+  // at nothing until the next sync.
+  if (response.newlyPriced) {
+    try {
+      const fresh = await client.pricing();
+      if (fresh.models && Object.keys(fresh.models).length > 0) pricing = fresh.models;
+    } catch {
+      // Keep the table we have; the next sync fetches again.
+    }
+  }
+
   await saveConfig({
     ...config,
     pricing: pricing ? { fetchedAt: new Date().toISOString(), models: pricing } : config.pricing,

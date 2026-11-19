@@ -19,6 +19,7 @@ import { parseLinks, serializeLinks } from "@/lib/links";
 import { billingFromPlans, parsePlans, serializePlans } from "@/lib/plans";
 import {
   parsePrefs,
+  BLOCKS,
   prefsFromForm,
   serializePrefs,
   withBlock,
@@ -72,6 +73,10 @@ async function saveProfile(formData: FormData) {
     avatar: formData.get("avatar"),
     blocks: formData.getAll("block"),
     stats: formData.getAll("stat"),
+    looks: Object.fromEntries(
+      BLOCKS.map((block) => [block, formData.get(`look.${block}`)]),
+    ),
+    half: formData.getAll("half"),
   });
 
   // Someone filling this in for the first time has a preferences blob written

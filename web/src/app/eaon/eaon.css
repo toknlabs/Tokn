@@ -1,0 +1,747 @@
+/*
+ * tokns.eaon.dev, Eaon's own site.
+ *
+ * As little as it takes: one narrow column, the system font, neutral greys
+ * that follow the system's light or dark appearance, hairlines between rows
+ * and no boxes. Colour is kept for meaning: Eaon's blue in its mark and on
+ * links, nowhere else. Charts are one colour, the text's, at a few strengths.
+ * Scoped to `.eaon-site`; nothing here touches toknhq.com.
+ */
+
+.eaon-site {
+  --e-bg: #ffffff;
+  --e-text: #1d1d1f;
+  --e-dim: #6e6e73;
+  --e-faint: #86868b;
+  --e-line: rgba(0, 0, 0, 0.09);
+  --e-hover: rgba(0, 0, 0, 0.035);
+  --e-fill: rgba(0, 0, 0, 0.18);
+  --e-link: #0066cc;
+  --e-mark: #0169cc;
+
+  --e-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --e-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--e-bg);
+  color: var(--e-text);
+  font-family: var(--e-font);
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.012em;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
+}
+
+@media (prefers-color-scheme: dark) {
+  .eaon-site {
+    --e-bg: #000000;
+    --e-text: #f5f5f7;
+    --e-dim: #a1a1a6;
+    --e-faint: #6e6e73;
+    --e-line: rgba(255, 255, 255, 0.12);
+    --e-hover: rgba(255, 255, 255, 0.05);
+    --e-fill: rgba(255, 255, 255, 0.24);
+    --e-link: #2997ff;
+    --e-mark: #339cff;
+    color-scheme: dark;
+  }
+}
+
+html:has(.eaon-site),
+html:has(.eaon-site) body {
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  html:has(.eaon-site),
+  html:has(.eaon-site) body {
+    background: #000000;
+  }
+}
+
+.eaon-site a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.eaon-site :focus-visible {
+  outline: 2px solid var(--e-link);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.e-wrap {
+  width: min(760px, calc(100% - 2.5rem));
+  margin-inline: auto;
+}
+
+main.e-wrap {
+  flex: 1;
+  padding-block: 4.5rem 6rem;
+}
+
+.e-page {
+  display: flex;
+  flex-direction: column;
+  gap: 5rem;
+}
+
+/* ---------------------------------------------------------------- frame */
+
+.e-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  border-bottom: 1px solid var(--e-line);
+}
+
+.e-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.e-symbol {
+  color: var(--e-mark);
+}
+
+.e-nav {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--e-dim);
+}
+
+.e-nav a,
+.e-footer a {
+  transition: color 150ms ease;
+}
+
+.e-nav a:hover,
+.e-footer a:hover {
+  color: var(--e-text);
+}
+
+.e-footer {
+  font-size: 0.75rem;
+  color: var(--e-faint);
+}
+
+.e-footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  padding-block: 1.5rem 2.5rem;
+  border-top: 1px solid var(--e-line);
+}
+
+.e-footer-inner a {
+  color: var(--e-dim);
+}
+
+.e-footer-links {
+  display: flex;
+  gap: 1.25rem;
+  margin-left: auto;
+}
+
+/* ---------------------------------------------------------------- text */
+
+.e-eyebrow {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--e-dim);
+}
+
+.e-lede {
+  margin: 1rem 0 0;
+  color: var(--e-dim);
+}
+
+.e-delta {
+  color: var(--e-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-empty {
+  margin: 0;
+  color: var(--e-dim);
+}
+
+.e-note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--e-faint);
+}
+
+.e-note a,
+.e-list dt a,
+.e-person-line a {
+  color: var(--e-link);
+}
+
+.e-note a:hover,
+.e-list dt a:hover,
+.e-person-line a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Period and sort: words, the chosen one in the text colour. */
+.e-tabs {
+  display: flex;
+  gap: 1.1rem;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.e-tabs a {
+  color: var(--e-faint);
+  white-space: nowrap;
+  transition: color 150ms ease;
+}
+
+.e-tabs a:hover,
+.e-tabs a[aria-current] {
+  color: var(--e-text);
+}
+
+.e-tabs a[aria-current] {
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- hero */
+
+.e-hero-top,
+.e-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  flex-wrap: wrap;
+}
+
+.e-big {
+  margin: 0.5rem 0 0;
+  font-family: var(--e-display);
+  font-size: clamp(3.5rem, 11vw, 5.5rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-big-unit {
+  margin-left: 0.5rem;
+  font-size: 0.3em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--e-faint);
+}
+
+.e-daily {
+  margin: 2.5rem 0 0;
+}
+
+.e-daily-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--e-line);
+}
+
+.e-daily-bar {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  min-width: 0;
+}
+
+.e-daily-bar i {
+  display: block;
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  background: var(--e-fill);
+}
+
+.e-daily-bar[data-today] i,
+.e-daily-bar:hover i {
+  background: var(--e-text);
+}
+
+.e-daily-axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--e-faint);
+}
+
+/* ---------------------------------------------------------------- sections */
+
+.e-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.e-section-head h2 {
+  margin: 0;
+  font-family: var(--e-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+}
+
+.e-section-note {
+  font-size: 0.875rem;
+  color: var(--e-faint);
+}
+
+/* ---------------------------------------------------------------- board */
+
+.e-title {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem 2rem;
+  flex-wrap: wrap;
+}
+
+.e-title h1 {
+  margin: 0;
+  font-family: var(--e-display);
+  font-size: clamp(2.25rem, 6vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.e-title p {
+  margin: 0.6rem 0 0;
+  color: var(--e-dim);
+}
+
+.e-join {
+  font-size: 0.9375rem;
+  color: var(--e-link) !important;
+  white-space: nowrap;
+}
+
+.e-join:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Four totals in a row, set apart by hairlines only. */
+.e-totals {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: -2rem 0 0;
+  border-top: 1px solid var(--e-line);
+  border-bottom: 1px solid var(--e-line);
+}
+
+.e-totals > div {
+  padding: 1.1rem 1rem 1.2rem 0;
+}
+
+.e-totals > div + div {
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--e-line);
+}
+
+.e-totals dt {
+  font-size: 0.8125rem;
+  color: var(--e-dim);
+}
+
+.e-totals dd {
+  margin: 0.3rem 0 0;
+  font-family: var(--e-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-totals .e-delta {
+  margin-left: 0.5rem;
+  font-family: var(--e-font);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.e-controls {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 2rem;
+  flex-wrap: wrap;
+}
+
+.e-controls-end {
+  display: flex;
+  align-items: baseline;
+  gap: 1.25rem;
+}
+
+.e-range {
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-table th {
+  padding: 0 0 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--e-faint);
+  text-align: left;
+  border-bottom: 1px solid var(--e-line);
+}
+
+.e-table td {
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--e-line);
+  vertical-align: middle;
+}
+
+.e-table th:first-child,
+.e-col-rank {
+  width: 2.75rem;
+}
+
+.e-col-rank {
+  font-size: 0.875rem;
+  color: var(--e-faint);
+}
+
+.e-table th:nth-child(3),
+.e-table th:nth-child(4),
+.e-col-mid,
+.e-col-value {
+  text-align: right;
+}
+
+.e-col-mid {
+  width: 7rem;
+  font-size: 0.875rem;
+  color: var(--e-dim);
+}
+
+.e-col-value {
+  width: 7rem;
+  font-weight: 600;
+}
+
+.e-table tbody tr {
+  transition: background 150ms ease;
+}
+
+.e-table tbody tr:hover {
+  background: var(--e-hover);
+}
+
+.e-who {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-width: 0;
+}
+
+.e-who > :first-child {
+  flex: none;
+  border-radius: 50%;
+}
+
+.e-who-names {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.e-who-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.e-who:hover .e-who-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.e-who-handle {
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+}
+
+/* ---------------------------------------------------------------- details */
+
+.e-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.e-daily + .e-groups {
+  margin-top: 1.75rem;
+}
+
+.e-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.6rem;
+}
+
+.e-group-head h3 {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.e-group-head span {
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+}
+
+.e-list {
+  margin: 0;
+  border-top: 1px solid var(--e-line);
+}
+
+.e-list > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--e-line);
+  font-size: 0.9375rem;
+}
+
+.e-list dt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--e-text);
+}
+
+.e-list dt > span:not(.brand-item) {
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+}
+
+.e-list dd {
+  margin: 0;
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.e-list dd span {
+  display: inline-block;
+  min-width: 3.5rem;
+  text-align: right;
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+}
+
+/* ---------------------------------------------------------------- profile */
+
+.e-person {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.e-person > :first-child {
+  border-radius: 50%;
+}
+
+.e-person-who h1 {
+  margin: 0;
+  font-family: var(--e-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.e-person-line {
+  margin: 0.2rem 0 0;
+  color: var(--e-dim);
+}
+
+.e-person-bio {
+  margin: 0.75rem 0 0;
+  color: var(--e-dim);
+}
+
+.e-person-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--e-faint);
+}
+
+.e-person-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--e-dim);
+}
+
+.e-person-meta a:hover {
+  color: var(--e-text);
+}
+
+/* Share and Tokn profile: quiet text actions, not buttons. */
+.e-person-actions {
+  display: flex;
+  gap: 1.25rem;
+  padding-top: 0.4rem;
+  font-size: 0.875rem;
+}
+
+.e-person-actions a,
+.eaon-site .e-person-actions .btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  color: var(--e-link);
+  cursor: pointer;
+}
+
+/* tokn's Share button says "share"; here it is a sentence-case link. */
+.eaon-site .e-person-actions .btn {
+  text-transform: capitalize;
+}
+
+.e-person-actions a:hover,
+.eaon-site .e-person-actions .btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+}
+
+/* A year of days, as squares. */
+.e-year-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.e-year {
+  display: grid;
+  grid-template-columns: repeat(53, minmax(0, 1fr));
+  gap: 2px;
+  min-width: 560px;
+}
+
+.e-year-month {
+  grid-row: 1;
+  padding-bottom: 0.35rem;
+  font-size: 0.6875rem;
+  color: var(--e-faint);
+  white-space: nowrap;
+}
+
+.e-year-cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--e-hover);
+}
+
+.e-year-cell[data-level="1"] {
+  background: color-mix(in srgb, var(--e-text) 22%, transparent);
+}
+
+.e-year-cell[data-level="2"] {
+  background: color-mix(in srgb, var(--e-text) 42%, transparent);
+}
+
+.e-year-cell[data-level="3"] {
+  background: color-mix(in srgb, var(--e-text) 66%, transparent);
+}
+
+.e-year-cell[data-level="4"] {
+  background: var(--e-text);
+}
+
+.e-year-cell[data-future] {
+  background: transparent;
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+@media (max-width: 640px) {
+  main.e-wrap {
+    padding-block: 2.5rem 4rem;
+  }
+
+  .e-page {
+    gap: 3.5rem;
+  }
+
+  .e-totals {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .e-totals > div:nth-child(3) {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .e-totals > div:nth-child(n + 3) {
+    border-top: 1px solid var(--e-line);
+  }
+
+  .e-col-mid {
+    display: none;
+  }
+
+  .e-table th:first-child,
+  .e-col-rank {
+    width: 2rem;
+  }
+
+  .e-person {
+    grid-template-columns: auto 1fr;
+  }
+
+  .e-person-actions {
+    grid-column: 1 / -1;
+  }
+
+  .e-footer-links {
+    margin-left: 0;
+  }
+}

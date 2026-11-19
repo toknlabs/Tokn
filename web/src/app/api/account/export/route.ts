@@ -1,5 +1,5 @@
 import { currentUser } from "@/lib/auth";
-import { listDevices, listPasskeys, listUsage } from "@/lib/backend";
+import { listAgents, listDevices, listPasskeys, listUsage } from "@/lib/backend";
 import { parseLinks } from "@/lib/links";
 import { parsePlans } from "@/lib/plans";
 import { parsePrefs } from "@/lib/prefs";
@@ -27,7 +27,7 @@ import { parsePrefs } from "@/lib/prefs";
  *
  * CSV is the usage rows alone, which is what anyone actually wants to open in a
  * spreadsheet and check our arithmetic against their own. JSON is the complete
- * record: profile, usage, devices, passkey metadata.
+ * record: profile, usage, agent runs, devices, passkey metadata.
  */
 
 export const dynamic = "force-dynamic";
@@ -80,7 +80,11 @@ export async function GET(request: Request) {
     });
   }
 
-  const [devices, passkeys] = await Promise.all([listDevices(user.id), listPasskeys(user.id)]);
+  const [devices, passkeys, agents] = await Promise.all([
+    listDevices(user.id),
+    listPasskeys(user.id),
+    listAgents(user.id),
+  ]);
 
   const payload = {
     exportedAt: new Date().toISOString(),
@@ -99,6 +103,14 @@ export async function GET(request: Request) {
       prefs: parsePrefs(user.prefs),
     },
     usage,
+    // Agent runs per day, from apps that report them (Eaon Desktop).
+    agents: agents.map((row) => ({
+      day: row.day,
+      tool: row.tool,
+      runs: row.runs,
+      totalMs: row.totalMs,
+      longestMs: row.longestMs,
+    })),
     devices: devices.map((device) => ({
       hostname: device.hostname ?? null,
       platform: device.platform ?? null,

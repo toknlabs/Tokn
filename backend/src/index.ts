@@ -19,7 +19,7 @@ export { ENV } from "./env.ts";
 // Low-level access, for seeding and maintenance scripts that need to reach
 // past the repositories. Application code should not use these.
 export { DB_ID, db, Query, ID } from "./client.ts";
-export { newId, hashToken, usageRowId, totalsRowId, pricingRowId } from "./ids.ts";
+export { newId, hashToken, usageRowId, agentRowId, totalsRowId, pricingRowId } from "./ids.ts";
 export { COLLECTIONS } from "./schema.ts";
 
 export * from "./crypto.ts";
@@ -30,6 +30,7 @@ export * from "./repo/devices.ts";
 export * from "./repo/passkeys.ts";
 export * from "./repo/friends.ts";
 export * from "./repo/usage.ts";
+export * from "./repo/agents.ts";
 export * from "./repo/integrity.ts";
 export * from "./repo/anatomy.ts";
 export * from "./repo/whatif.ts";
@@ -40,7 +41,17 @@ export {
   pricingTableForCli,
   refreshPricingFromCatalog,
 } from "./refresh-pricing.ts";
+export {
+  clearLogoCache,
+  createLogoResolver,
+  getDynamicModelLogoSvg,
+  resolveDynamicModelLogos,
+  type LogoLookupIo,
+  type ResolvedModelLogo,
+  type ResolveLogosOptions,
+} from "./refresh-logos.ts";
 export * from "./service.ts";
 export * from "./passkey-service.ts";
 export * from "./return-path.ts";
+export * from "./request-url.ts";
 export * from "./oauth/index.ts";

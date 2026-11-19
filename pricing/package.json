@@ -2,5 +2,9 @@
   "name": "tokn-pricing",
   "private": true,
   "type": "module",
-  "description": "Shared models.dev catalog builder for the CLI fallback and the Appwrite price table."
+  "description": "Shared models.dev catalog builder for the CLI fallback, price table, and model logos.",
+  "scripts": {
+    "test": "node --experimental-strip-types --test catalog.test.ts logos.test.ts",
+    "logos": "node --experimental-strip-types gen-logos.ts"
+  }
 }

@@ -2,16 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AreaChart, ShareBars } from "@/components/Charts";
 import { Avatar } from "@/components/Avatar";
+import { ModelMix } from "@/components/ModelMix";
+import { ToolLogo } from "@/components/BrandLogo";
 import { Ticker, type TickerFormat } from "@/components/Ticker";
-import {
-  compact,
-  count,
-  money,
-  niceDay,
-  percent,
-  relative,
-} from "@/lib/format";
-import { modelLabel } from "@/lib/pricing";
+import { compact, count, money, niceDay, relative } from "@/lib/format";
+import { resolveModelLogos } from "@/lib/logos-server";
 import { siteStats } from "@/lib/site-stats";
 import { leaderboard } from "@/lib/stats";
 
@@ -48,6 +43,7 @@ const WINDOW_DAYS = 30;
 export default async function StatsPage() {
   const stats = await siteStats(WINDOW_DAYS);
   const month = await leaderboard("month", "cost", 10, { activeOnly: true });
+  const modelLogos = await resolveModelLogos(stats.byModel.map((model) => model.model));
 
   const seconds = WINDOW_DAYS * 86_400;
   const perSecond = stats.window.tokens / seconds;
@@ -118,21 +114,9 @@ export default async function StatsPage() {
         </div>
       </section>
 
-      <div className="split">
-        <section>
-          <p className="block-label">model mix</p>
-          <p className="block-value">{stats.byModel.length} models</p>
-          <div style={{ marginTop: "1.25rem" }}>
-            <ShareBars
-              rows={stats.byModel.slice(0, 8).map((point) => ({
-                label: modelLabel(point.model),
-                value: point.cost,
-                display: `${money(point.cost, 2)} · ${percent(point.cost, stats.window.cost)}`,
-              }))}
-            />
-          </div>
-        </section>
+      <ModelMix models={stats.byModel} windowDays={WINDOW_DAYS} logoMap={modelLogos} />
 
+      <div className="split">
         <section>
           <p className="block-label">tools</p>
           <p className="block-value">
@@ -144,11 +128,13 @@ export default async function StatsPage() {
             ) : (
               <ShareBars
                 rows={stats.byTool.map((point) => ({
+                  key: point.tool,
                   label: point.tool,
                   value: point.cost,
                   display: `${money(point.cost, 2)} · ${point.users} ${
                     point.users === 1 ? "dev" : "devs"
                   }`,
+                  icon: <ToolLogo tool={point.tool} />,
                 }))}
               />
             )}

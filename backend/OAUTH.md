@@ -2,7 +2,11 @@
 
 An OAuth 2.0 authorization server for desktop apps, so an app can sign someone
 in with their tokn account and upload usage for them. The first client is Eaon
-Desktop, whose Settings → Usage page uses it.
+Desktop, whose Settings → Usage page uses it. Orca (`client_id=orca`, loopback
+path `/tokn/callback`) uses it from Settings → Stats → Publish usage, and
+uploads its tracked Claude Code and Codex totals under the same `claude-code`
+and `codex` tools the CLI uses, so the two upsert the same rows rather than
+double-counting.
 
 ## The flow
 
@@ -37,6 +41,10 @@ Authorization code with PKCE (S256 only), for public native clients
    under connected machines on `/account` as the app ("Eaon Desktop ·
    hostname"), where revoking it signs the app out.
 7. `POST /api/oauth/revoke` (RFC 7009) revokes a token. It always answers 200.
+8. An app signed in with `usage:write` can link the tokn command on the same
+   machine without a second sign-in: `POST /api/cli/link-code` with its token
+   returns `{ code, expiresAt }`, the same single-use code `/link` shows, and
+   `tokn link --code <code>` redeems it. Eaon Desktop ships tokn and does this.
 
 Metadata is at `GET /.well-known/oauth-authorization-server` (RFC 8414).
 

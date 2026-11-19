@@ -55,6 +55,12 @@ export interface SyncResponse {
    */
   rejected?: { day: string; model: string; reason: string; detail: string }[];
   /**
+   * Models this upload brought that the server had no price for until it
+   * checked models.dev during the sync. The table this CLI fetched before
+   * uploading predates them, so it should fetch again.
+   */
+  newlyPriced?: string[];
+  /**
    * The leaderboard's schedule. A sync is on your profile as soon as it is
    * stored, but the board refreshes on the hour, so the upload shows there at
    * `nextUpdateAt`. Absent from servers that predate the hourly board.
@@ -87,6 +93,7 @@ export class ApiClient {
     endpoint: string,
     body?: unknown,
     auth = true,
+    timeoutMs = TIMEOUT_MS,
   ): Promise<T> {
     const url = `${this.host.replace(/\/+$/, "")}${endpoint}`;
 
@@ -98,7 +105,7 @@ export class ApiClient {
     if (auth && this.token) headers.authorization = `Bearer ${this.token}`;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
     let response: Response;
     try {
@@ -217,12 +224,14 @@ export class ApiClient {
     return this.request<SyncResponse>("POST", "/api/cli/sync", payload);
   }
 
-  pricing(): Promise<{ models: Record<string, ModelPrice> }> {
+  /** `timeoutMs` for callers that would rather price from the saved table than wait. */
+  pricing(timeoutMs?: number): Promise<{ models: Record<string, ModelPrice> }> {
     return this.request<{ models: Record<string, ModelPrice> }>(
       "GET",
       "/api/cli/pricing",
       undefined,
       false,
+      timeoutMs,
     );
   }
 

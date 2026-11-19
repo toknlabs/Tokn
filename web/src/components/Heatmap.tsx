@@ -2,8 +2,9 @@ import { money, niceDay } from "@/lib/format";
 import { toDay } from "@/lib/stats";
 
 /**
- * A year of activity as a dot grid: one column per week, Sunday at the top,
- * month initials along the header.
+ * A year of activity as a grid of squares, like GitHub's: one column per
+ * week, Sunday at the top, month initials along the header, and the squares
+ * sized to fill the width they are given.
  *
  * Intensity is ranked rather than linear. A single $40 day would otherwise
  * flatten every other dot to the faintest shade, so the four shades are
@@ -46,52 +47,48 @@ export function Heatmap({ days, weeks = 53 }: { days: HeatmapDay[]; weeks?: numb
     columns.push({ key, month, cells });
   }
 
+  // One grid: the weekday labels in the first column, then a column per
+  // week that shares the width evenly, so the squares grow to fill the page
+  // and the months line up with the weeks they start in.
   return (
     <div className="scroll-x">
-      <div className="heat" style={{ minWidth: columns.length * 15 + 24 }}>
-        <div className="heat-months">
-          {columns.map((column, index) => (
-            <span
-              key={column.key}
-              style={{ width: 11, marginRight: index === columns.length - 1 ? 0 : 4 }}
-            >
-              {/* The initial goes on the first column that lands in a month. */}
-              {index === 0 || columns[index - 1]!.month !== column.month
-                ? MONTHS[column.month]
-                : ""}
+      <div
+        className="heat"
+        style={{ "--weeks": columns.length, minWidth: columns.length * 10 + 24 } as React.CSSProperties}
+      >
+        {columns.map((column, index) =>
+          index === 0 || columns[index - 1]!.month !== column.month ? (
+            <span key={`m-${column.key}`} className="heat-month" style={{ gridColumn: index + 2 }}>
+              {MONTHS[column.month]}
             </span>
-          ))}
-        </div>
+          ) : null,
+        )}
 
-        <div className="heat-days">
-          {DAY_LABELS.map((label, index) => (
-            <span key={index}>{label}</span>
-          ))}
-        </div>
+        {DAY_LABELS.map((label, index) => (
+          <span key={`d-${index}`} className="heat-day" style={{ gridRow: index + 2 }}>
+            {label}
+          </span>
+        ))}
 
-        <div className="heat-grid">
-          {columns.map((column) => (
-            <div className="heat-col" key={column.key}>
-              {column.cells.map((cell) => {
-                const entry = byDay.get(cell.day);
-                const level = cell.future ? 0 : levelFor(entry?.cost ?? 0, thresholds);
-                return (
-                  <span
-                    key={cell.day}
-                    className="dot"
-                    data-level={level}
-                    style={cell.future ? { opacity: 0.4 } : undefined}
-                    title={
-                      entry
-                        ? `${niceDay(cell.day)} · ${money(entry.cost)} · ${entry.requests} requests`
-                        : `${niceDay(cell.day)} · no usage`
-                    }
-                  />
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        {columns.map((column, week) =>
+          column.cells.map((cell, weekday) => {
+            const entry = byDay.get(cell.day);
+            const level = cell.future ? 0 : levelFor(entry?.cost ?? 0, thresholds);
+            return (
+              <span
+                key={cell.day}
+                className="dot"
+                data-level={level}
+                style={{ gridColumn: week + 2, gridRow: weekday + 2, ...(cell.future ? { opacity: 0.4 } : {}) }}
+                title={
+                  entry
+                    ? `${niceDay(cell.day)} · ${money(entry.cost)} · ${entry.requests} requests`
+                    : `${niceDay(cell.day)} · no usage`
+                }
+              />
+            );
+          }),
+        )}
       </div>
     </div>
   );

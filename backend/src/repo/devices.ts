@@ -179,6 +179,38 @@ export async function listDevices(userId: string): Promise<Device[]> {
   return result.documents as unknown as Device[];
 }
 
+const DEVICE_PAGE = 500;
+
+/**
+ * Every device row whose version starts with an app's client id, revoked ones
+ * included, across all accounts — for the owner pages. Only rows an app's
+ * sign-in could have made: a CLI can report any version string it likes, so
+ * the caller still checks each one with `oauthAppForDevice`.
+ */
+export async function listDevicesForApp(clientId: string): Promise<Device[]> {
+  const out: Device[] = [];
+  let cursor: string | undefined;
+
+  for (;;) {
+    const queries = [
+      Query.startsWith("cliVersion", clientId),
+      Query.limit(DEVICE_PAGE),
+      Query.orderAsc("$id"),
+    ];
+    if (cursor) queries.push(Query.cursorAfter(cursor));
+
+    const page = await db().listDocuments(DB_ID, "devices", queries);
+    const docs = page.documents as unknown as Device[];
+    out.push(...docs);
+
+    if (docs.length < DEVICE_PAGE) break;
+    cursor = docs[docs.length - 1]?.$id;
+    if (!cursor) break;
+  }
+
+  return out;
+}
+
 export async function revokeDevice(userId: string, deviceId: string): Promise<boolean> {
   try {
     const device = (await db().getDocument(DB_ID, "devices", deviceId)) as unknown as Device;

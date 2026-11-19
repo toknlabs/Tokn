@@ -1,5 +1,8 @@
 import fs from "node:fs";
 import overridesJson from "./overrides.json" with { type: "json" };
+import { normalizeModelId } from "./normalize.ts";
+
+export { normalizeModelId };
 
 /**
  * One builder for every price table tokn serves.
@@ -102,30 +105,6 @@ export function loadOverrides(file?: string): Record<string, PriceOverride> {
   return JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, PriceOverride>;
 }
 
-/**
- * Reduce a model identifier to the form stored in the catalog.
- *
- * Real logs carry provider prefixes, Bedrock region prefixes, Vertex
- * `@`-versions and dated snapshots. `openai/gpt-6-luna` and
- * `gpt-6-luna-20260922` price as `gpt-6-luna`. A leading `~` is kept, so an
- * alias such as `~openai/gpt-luna-latest` stays its own row instead of being
- * mistaken for the vendor prefix `openai/`.
- */
-export function normalizeModelId(raw: string): string {
-  let id = raw.trim().toLowerCase();
-
-  id = id.replace(/^(us|eu|apac|global|ca|sa|apne|usgov)\./, "");
-  id = id.replace(/^anthropic\./, "");
-  id = id.replace(/^[a-z0-9-]+\//, "");
-  id = id.replace(/-v\d+(?::\d+)?$/, "");
-
-  const at = id.indexOf("@");
-  if (at !== -1) id = id.slice(0, at);
-
-  id = id.replace(/-\d{8}$/, "");
-  return id;
-}
-
 function applyOverride(row: PriceDraft, override: PriceOverride | undefined): PriceDraft {
   if (!override) return row;
   return {
@@ -185,6 +164,24 @@ export function buildPriceTable(
     }
   }
 
+  // Fast mode is listed as a model of its own, `<id>-fast`, so a model's fast
+  // rate arrives with its release instead of waiting for someone to write an
+  // override. Anthropic's ids are hyphenated where the catalog's fast variant
+  // may be dotted (`claude-opus-5-5` beside `claude-opus-5.5-fast`), so Claude
+  // ids are matched with dots folded. An override that names a fast rate wins.
+  const fastKey = (id: string) => (id.startsWith("claude-") ? id.replace(/\./g, "-") : id);
+  const fastRates = new Map<string, PriceDraft>();
+  for (const row of seen.values()) {
+    if (row.modelId.endsWith("-fast")) fastRates.set(fastKey(row.modelId.slice(0, -"-fast".length)), row);
+  }
+  for (const row of seen.values()) {
+    if (row.fastInput !== null || row.fastOutput !== null) continue;
+    const fast = fastRates.get(fastKey(row.modelId));
+    if (!fast) continue;
+    row.fastInput = fast.input;
+    row.fastOutput = fast.output;
+  }
+
   for (const [key, override] of Object.entries(overrides)) {
     if (seen.has(key)) continue;
     if (typeof override.input !== "number" || typeof override.output !== "number") continue;
@@ -227,6 +224,29 @@ export function cliTuple(row: PriceDraft): number[] {
 const CACHE = process.env.TOKN_CATALOG_CACHE ?? "/tmp/modelsdev.json";
 
 /** Fetch the live catalog, falling back to the last copy on disk. */
+/**
+ * The catalog, unless it is unchanged since `etag`, in which case `null`.
+ *
+ * models.dev serves an ETag, so "is there anything new?" costs a 304 and no
+ * body. Unlike `fetchCatalog` there is no fallback to the cached copy: the
+ * caller is looking for a model the last copy did not have.
+ */
+export async function fetchCatalogIfChanged(
+  etag: string | null,
+  options: { url?: string; timeoutMs?: number } = {},
+): Promise<{ catalog: ModelsDevCatalog; etag: string | null } | null> {
+  const response = await fetch(options.url ?? CATALOG_URL, {
+    headers: etag ? { "if-none-match": etag } : {},
+    signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+  });
+  if (response.status === 304) return null;
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return {
+    catalog: (await response.json()) as ModelsDevCatalog,
+    etag: response.headers.get("etag"),
+  };
+}
+
 export async function fetchCatalog(url = CATALOG_URL): Promise<ModelsDevCatalog> {
   try {
     const response = await fetch(url);

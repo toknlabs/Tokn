@@ -77,7 +77,12 @@ export async function upsertPrices(rows: PriceRow[]): Promise<number> {
  * collapses the duplicate work; the short expiry keeps a long-lived server
  * from pinning a stale table.
  */
-let priceCache: { at: number; table: Promise<Record<string, CliPrice>> } | null = null;
+interface LoadedPricing {
+  table: Record<string, CliPrice>;
+  providers: Record<string, string>;
+}
+
+let priceCache: { at: number; data: Promise<LoadedPricing> } | null = null;
 const PRICE_TTL_MS = 60_000;
 
 /** Newest `updatedAt` seen the last time the table was loaded from Appwrite. */
@@ -87,16 +92,25 @@ export function pricingUpdatedAt(): string | null {
   return newestUpdatedAt;
 }
 
+async function loadPricingCached(): Promise<LoadedPricing> {
+  if (priceCache && Date.now() - priceCache.at < PRICE_TTL_MS) return priceCache.data;
+  const data = loadPricingTable();
+  priceCache = { at: Date.now(), data };
+  // A failed load must not be cached, or one blip poisons the next minute.
+  data.catch(() => {
+    if (priceCache?.data === data) priceCache = null;
+  });
+  return data;
+}
+
 /** Every price, as the map the CLI consumes. */
 export async function pricingTable(): Promise<Record<string, CliPrice>> {
-  if (priceCache && Date.now() - priceCache.at < PRICE_TTL_MS) return priceCache.table;
-  const table = loadPricingTable();
-  priceCache = { at: Date.now(), table };
-  // A failed load must not be cached, or one blip poisons the next minute.
-  table.catch(() => {
-    if (priceCache?.table === table) priceCache = null;
-  });
-  return table;
+  return (await loadPricingCached()).table;
+}
+
+/** Stored provider column per model ID, sharing the pricing memo. */
+export async function pricingProviders(): Promise<Record<string, string>> {
+  return (await loadPricingCached()).providers;
 }
 
 /** Drop the memo. Used after a pricing refresh writes new rows. */
@@ -105,8 +119,9 @@ export function clearPricingCache(): void {
   newestUpdatedAt = null;
 }
 
-async function loadPricingTable(): Promise<Record<string, CliPrice>> {
-  const out: Record<string, CliPrice> = {};
+async function loadPricingTable(): Promise<LoadedPricing> {
+  const table: Record<string, CliPrice> = {};
+  const providers: Record<string, string> = {};
   let cursor: string | undefined;
   let newest: string | null = null;
   // 702 models at 100 a page is eight sequential round trips. Appwrite will
@@ -128,7 +143,8 @@ async function loadPricingTable(): Promise<Record<string, CliPrice>> {
       if (row.fastInput != null && row.fastOutput != null) {
         price.fast = { input: row.fastInput, output: row.fastOutput };
       }
-      out[row.modelId] = price;
+      table[row.modelId] = price;
+      if (row.provider) providers[row.modelId] = row.provider;
       const updatedAt = row.updatedAt;
       if (updatedAt && (newest === null || updatedAt > newest)) newest = updatedAt;
     }
@@ -139,7 +155,7 @@ async function loadPricingTable(): Promise<Record<string, CliPrice>> {
   }
 
   newestUpdatedAt = newest;
-  return out;
+  return { table, providers };
 }
 
 export async function priceCount(): Promise<number> {

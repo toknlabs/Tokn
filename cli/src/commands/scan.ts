@@ -1,4 +1,5 @@
 import { loadConfig } from "../core/config.js";
+import { currentPricing } from "../core/pricing-refresh.js";
 import { NoSessionsError, runScan, toolName, type ScanResult } from "../core/run-scan.js";
 import { unreadable } from "../core/sources/registry.js";
 import { totalTokens } from "../core/pricing.js";
@@ -17,7 +18,7 @@ export async function scanCommand(args: ParsedArgs): Promise<number> {
   try {
     result = await runScan({
       since: resolveSince(args),
-      pricing: config.pricing?.models,
+      pricing: await currentPricing(config),
       only: typeof args.flags.tool === "string" ? [args.flags.tool] : undefined,
       quiet: json,
     });

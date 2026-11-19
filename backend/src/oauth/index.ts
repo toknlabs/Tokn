@@ -6,6 +6,7 @@
  *   authorize.ts  the authorize decision, approve / deny, the origin check
  *   token.ts      token exchange and revocation against a store interface
  *   devices.ts    how an app's grant is recorded as a device row
+ *   signins.ts    those rows folded into one per person, for the owner pages
  *   service.ts    the same, bound to Appwrite
  *
  * See OAUTH.md beside the backend README for the flow end to end.
@@ -17,4 +18,5 @@ export * from "./params.ts";
 export * from "./authorize.ts";
 export * from "./token.ts";
 export * from "./devices.ts";
+export * from "./signins.ts";
 export * from "./service.ts";

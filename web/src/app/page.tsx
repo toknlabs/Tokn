@@ -2,7 +2,10 @@ import Link from "next/link";
 import { Segmented } from "@/components/Segmented";
 import { Ticker, type TickerFormat } from "@/components/Ticker";
 import { currentUser } from "@/lib/auth";
+import { ModelName } from "@/components/BrandLogo";
 import { compact, count, money, relative, sinceDay } from "@/lib/format";
+import type { SerializedLogo } from "@/lib/logos";
+import { resolveModelLogos } from "@/lib/logos-server";
 import { modelLabel } from "@/lib/pricing";
 import {
   METRICS,
@@ -72,6 +75,7 @@ export default async function LeaderboardPage({
       : undefined;
 
   const rows = myRow ? [...entries, myRow] : entries;
+  const logoMap = await resolveModelLogos(rows.map((entry) => entry.topModel));
   // Index of the appended row, so it can be set apart from the page it is not
   // really part of. -1 when you are on this page already.
   const detachedAt = myRow ? rows.length - 1 : -1;
@@ -193,6 +197,7 @@ export default async function LeaderboardPage({
                     meId={me?.id}
                     previousRank={previous.get(entry.userId)}
                     detached={index === detachedAt}
+                    topModelLogo={entry.topModel ? logoMap[entry.topModel] : undefined}
                   />
                 ))}
               </tbody>
@@ -274,6 +279,7 @@ function Row({
   meId,
   previousRank,
   detached,
+  topModelLogo,
 }: {
   entry: LeaderboardEntry;
   index: number;
@@ -282,6 +288,7 @@ function Row({
   previousRank?: number;
   /** Your own row, carried onto a page it does not belong to. */
   detached?: boolean;
+  topModelLogo?: SerializedLogo;
 }) {
   // Only the ranked column is at full strength; the others recede.
   const tone = (target: Metric) =>
@@ -340,7 +347,12 @@ function Row({
       </td>
       <td className="sub">
         {entry.topModel ? (
-          modelLabel(entry.topModel)
+          <ModelName
+            model={entry.topModel}
+            label={modelLabel(entry.topModel)}
+            logo={topModelLogo}
+            size={13}
+          />
         ) : (
           <span className="idle">&mdash;</span>
         )}

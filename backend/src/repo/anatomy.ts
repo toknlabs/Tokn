@@ -165,6 +165,12 @@ export interface ReuseBenchmark {
   median: number | null;
   /** Percentile 0-100 among users with a comparable ratio. */
   percentile: number | null;
+  /**
+   * Place in the cohort, 1 for the best ratio. Easier to read than a
+   * percentile in a small cohort, where "40th percentile" can sit exactly on
+   * the median.
+   */
+  rank: number | null;
   /** How many users the comparison is drawn from. */
   cohort: number;
   /**
@@ -213,18 +219,20 @@ export async function reuseBenchmark(
 
   // Below a handful of people a "median" and a "percentile" are theatre.
   if (ratios.length < 5 || ratio === null) {
-    return { ratio, median: null, percentile: null, cohort: ratios.length, headroomUsd: null };
+    return { ratio, median: null, percentile: null, rank: null, cohort: ratios.length, headroomUsd: null };
   }
 
   ratios.sort((a, b) => a - b);
   const median = ratios[Math.floor(ratios.length / 2)] ?? 0;
   const below = ratios.filter((r) => r < ratio).length;
   const percentile = Math.round((below / ratios.length) * 100);
+  const rank = ratios.filter((r) => r > ratio).length + 1;
 
   return {
     ratio,
     median,
     percentile,
+    rank,
     cohort: ratios.length,
     headroomUsd: ratio >= median ? null : headroom(own, median),
   };

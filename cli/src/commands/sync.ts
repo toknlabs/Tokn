@@ -75,10 +75,14 @@ export async function syncCommand(args: ParsedArgs): Promise<number> {
     });
     spinner.clearAndStop();
 
+    // The server priced a model it met in this upload, so the table fetched
+    // before uploading is already behind. Save the one that knows it.
+    const latest = response.newlyPriced ? await refreshPricing(client, pricing) : pricing;
+
     await saveConfig({
       ...config,
-      pricing: pricing
-        ? { fetchedAt: new Date().toISOString(), models: pricing }
+      pricing: latest
+        ? { fetchedAt: new Date().toISOString(), models: latest }
         : config.pricing,
       lastSyncAt: new Date().toISOString(),
       lastSyncRows: rows.length,
@@ -87,6 +91,11 @@ export async function syncCommand(args: ParsedArgs): Promise<number> {
     out.write(
       `\n  ${green(sym.tick)} Published ${bold(usd(result.aggregation.totals.cost.total))} across ${bold(fullNumber(result.aggregation.totals.requests))} requests\n`,
     );
+
+    if (response.newlyPriced) {
+      const names = response.newlyPriced.map(shortModel).join(", ");
+      out.write(`  ${dim(`New ${response.newlyPriced.length === 1 ? "model" : "models"} priced from models.dev: ${names}`)}\n`);
+    }
 
     // The server prices every row itself and drops anything it cannot make
     // sense of. Staying quiet about that would leave someone comparing their
@@ -97,15 +106,31 @@ export async function syncCommand(args: ParsedArgs): Promise<number> {
         `\n  ${yellow(sym.bullet)} The server did not store ${bold(String(n))} ` +
           `${n === 1 ? "row" : "rows"}:\n`,
       );
-      for (const row of response.rejected.slice(0, 5)) {
-        out.write(`    ${dim(`${row.day}  ${shortModel(row.model)}`)}  ${dim(row.detail)}\n`);
+      // A day refused whole comes back once per row, all with the same
+      // detail. One line for the day says it without repeating it.
+      const lines = new Map<string, string>();
+      for (const row of response.rejected) {
+        const wholeDay = row.reason.endsWith("-per-day");
+        const key = wholeDay ? `${row.day} ${row.reason}` : `${row.day} ${row.model} ${row.reason}`;
+        if (lines.has(key)) continue;
+        const what = wholeDay ? "every model" : shortModel(row.model);
+        lines.set(key, `    ${dim(`${row.day}  ${what}`)}  ${dim(row.detail)}\n`);
       }
-      if (n > 5) out.write(`    ${dim(`… and ${n - 5} more`)}\n`);
+      const shown = [...lines.values()];
+      for (const line of shown.slice(0, 5)) out.write(line);
+      if (shown.length > 5) out.write(`    ${dim(`… and ${shown.length - 5} more`)}\n`);
       const unpriced = response.rejected.some((r) => r.reason === "unpriceable-model");
       if (unpriced) {
         out.write(
-          `  ${dim("A model with no published rate cannot be priced. Report it and it")}\n` +
-            `  ${dim("will be added.")}\n`,
+          `  ${dim("No price is published for that model yet. New models are priced")}\n` +
+            `  ${dim("automatically once models.dev lists them; the next sync counts it.")}\n`,
+        );
+      }
+      const overDay = response.rejected.some((r) => r.reason.endsWith("-per-day"));
+      if (overDay) {
+        out.write(
+          `  ${dim("A day past what one account can produce is left out whole. If that")}\n` +
+            `  ${dim("day is real, report it and the limit will be looked at.")}\n`,
         );
       }
       out.write("\n");

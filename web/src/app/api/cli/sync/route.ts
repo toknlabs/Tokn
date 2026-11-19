@@ -1,3 +1,4 @@
+import { revalidatePath, revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { cliSync } from "@/lib/backend";
 import { boardUpdatedAt, leaderboard, nextBoardUpdate } from "@/lib/stats";
@@ -35,6 +36,13 @@ export async function POST(request: Request) {
 
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  // The pricing route is cached for an hour. A table that just learned a new
+  // model has to reach the next CLI that asks, not the one after the hour.
+  if (result.newlyPriced) {
+    revalidatePath("/api/cli/pricing");
+    revalidateTag("model-logos");
   }
 
   return NextResponse.json({

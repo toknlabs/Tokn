@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { niceDay } from "@/lib/format";
 
 /**
@@ -105,7 +106,7 @@ export function ShareBars({
   rows,
   total: scale,
 }: {
-  rows: { label: string; value: number; display: string }[];
+  rows: { key?: string; label: string; value: number; display: string; icon?: ReactNode }[];
   /**
    * What the bars are measured against, when that is not the rows given.
    *
@@ -122,7 +123,7 @@ export function ShareBars({
   return (
     <div style={{ display: "grid", gap: "0.85rem" }}>
       {rows.map((row) => (
-        <div key={row.label}>
+        <div key={row.key ?? row.label}>
           <div
             style={{
               display: "flex",
@@ -131,8 +132,15 @@ export function ShareBars({
               marginBottom: "0.4rem",
             }}
           >
-            <span className="sub" style={{ fontSize: "0.8125rem" }}>
-              {row.label}
+            <span className="sub" style={{ fontSize: "0.8125rem", minWidth: 0 }}>
+              {row.icon ? (
+                <span className="brand-item">
+                  {row.icon}
+                  <span className="brand-label">{row.label}</span>
+                </span>
+              ) : (
+                row.label
+              )}
             </span>
             <span style={{ fontSize: "0.8125rem" }}>{row.display}</span>
           </div>

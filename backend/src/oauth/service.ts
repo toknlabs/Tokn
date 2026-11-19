@@ -1,8 +1,15 @@
 import { ENV } from "../env.ts";
-import { insertDevice, revokeDeviceById, revokeDeviceByTokenHash } from "../repo/devices.ts";
-import { findProfileById } from "../repo/profiles.ts";
+import {
+  insertDevice,
+  listDevicesForApp,
+  revokeDeviceById,
+  revokeDeviceByTokenHash,
+} from "../repo/devices.ts";
+import { findProfileById, findProfilesByIds } from "../repo/profiles.ts";
+import type { OAuthClient } from "./clients.ts";
 import { oauthKey } from "./code.ts";
 import type { OAuthParams } from "./params.ts";
+import { appSignIns, signInsOf, type AppSignIn } from "./signins.ts";
 import {
   authorizationServerMetadata,
   exchangeToken,
@@ -47,4 +54,14 @@ export function oauthRevoke(params: OAuthParams | null): Promise<OAuthReply> {
 
 export function oauthMetadata(): Record<string, unknown> {
   return authorizationServerMetadata(ENV.publicUrl);
+}
+
+/**
+ * Everyone who has signed in to `client`, for the owner pages: one read per
+ * sign-in and one per hundred people, nothing per page of usage.
+ */
+export async function listAppSignIns(client: OAuthClient): Promise<AppSignIn[]> {
+  const devices = signInsOf(client, await listDevicesForApp(client.id));
+  const profiles = await findProfilesByIds(devices.map((device) => device.userId));
+  return appSignIns(client, devices, profiles);
 }

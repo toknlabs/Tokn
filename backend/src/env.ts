@@ -5,10 +5,9 @@ import { fileURLToPath } from "node:url";
 /**
  * Configuration, read from the environment.
  *
- * In production (Vercel, Appwrite Functions) these arrive as real environment
- * variables. For local work we also read the repo-root `.env`, which is
- * gitignored — the API key is a full-access project credential and must never
- * reach a commit.
+ * In production (Vercel) these arrive as real environment variables. For local
+ * work we also read the repo-root `.env`, which is gitignored — the Supabase
+ * secret key is a full-access credential and must never reach a commit.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -48,11 +47,37 @@ function required(name: string): string {
 }
 
 export const ENV = {
-  endpoint: process.env.APPWRITE_ENDPOINT ?? "https://sfo.cloud.appwrite.io/v1",
-  projectId: process.env.APPWRITE_PROJECT_ID ?? "eaon",
-  get apiKey(): string {
-    return required("APPWRITE_API_KEY");
+  /** The Supabase project, e.g. https://<ref>.supabase.co */
+  get supabaseUrl(): string {
+    return required("SUPABASE_URL").replace(/\/+$/, "");
   },
-  databaseId: process.env.TOKN_DATABASE_ID ?? "tokn",
+  /** A secret (service-role) key. Full access past row-level security: server only. */
+  get supabaseKey(): string {
+    return required("SUPABASE_SECRET_KEY");
+  },
+  /** The Postgres schema holding the tokn tables, exposed through the Data API. */
+  schema: process.env.TOKN_SCHEMA ?? "tokn",
   publicUrl: process.env.TOKN_PUBLIC_URL ?? "http://localhost:3000",
+  /**
+   * Where the Eaon Desktop board lives. Same deployment, second hostname: the
+   * web app's middleware serves the Eaon pages when a request arrives on it.
+   */
+  eaonUrl: process.env.TOKN_EAON_URL ?? "https://tokns.eaon.dev",
+  /** Who may open the owner pages. See `parseOwnerIds`. */
+  get ownerIds(): string[] {
+    return parseOwnerIds(process.env.TOKN_OWNER_IDS);
+  },
 };
+
+/**
+ * `TOKN_OWNER_IDS`: the profile ids, comma-separated, of the people who run
+ * the site. Ids rather than handles: a handle can be changed and the old one
+ * taken by someone else, and that someone must not inherit the owner pages.
+ * Unset means nobody, so a deployment without it shows them to no one.
+ */
+export function parseOwnerIds(raw: string | undefined): string[] {
+  return (raw ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+}

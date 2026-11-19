@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { currentUser } from "@/lib/auth";
 import { getTotals } from "@/lib/backend";
 import { compact, money } from "@/lib/format";
+import { isOwner } from "@/lib/owner";
 import { parsePrefs } from "@/lib/prefs";
 
 /**
@@ -54,7 +55,7 @@ export default async function AccountLayout({
         </div>
       </header>
 
-      <AccountNav handle={user.handle} />
+      <AccountNav handle={user.handle} owner={isOwner(user.id)} />
 
       {children}
     </>

@@ -71,3 +71,34 @@ test("overrides patch cache and fast fields without replacing catalog rates", ()
   assert.equal(opus.fastInput, 10);
   assert.equal(opus.fastOutput, 50);
 });
+
+test("fast mode comes from the catalog's -fast variant, and an override still wins", () => {
+  const rows = new Map(
+    buildPriceTable(
+      {
+        anthropic: {
+          models: {
+            // Anthropic's id is hyphenated; the catalog's fast variant is dotted.
+            "claude-opus-5-5": { cost: { input: 4, output: 20 } },
+            "claude-opus-5.5-fast": { cost: { input: 8, output: 40 } },
+            "claude-opus-5": { cost: { input: 5, output: 25 } },
+            "claude-opus-5-fast": { cost: { input: 12, output: 60 } },
+          },
+        },
+        openai: {
+          models: {
+            "gpt-5.6-sol": { cost: { input: 4, output: 20 } },
+            "gpt-5.6-sol-fast": { cost: { input: 8, output: 40 } },
+            "gpt-6-luna": { cost: { input: 0.1, output: 0.5 } },
+          },
+        },
+      } as ModelsDevCatalog,
+      { "claude-opus-5": { fastInput: 10, fastOutput: 50 } },
+    ).map((row) => [row.modelId, row]),
+  );
+
+  assert.deepEqual([rows.get("claude-opus-5-5")?.fastInput, rows.get("claude-opus-5-5")?.fastOutput], [8, 40]);
+  assert.deepEqual([rows.get("gpt-5.6-sol")?.fastInput, rows.get("gpt-5.6-sol")?.fastOutput], [8, 40]);
+  assert.deepEqual([rows.get("claude-opus-5")?.fastInput, rows.get("claude-opus-5")?.fastOutput], [10, 50]);
+  assert.equal(rows.get("gpt-6-luna")?.fastInput, null);
+});

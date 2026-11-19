@@ -18,10 +18,13 @@ export async function generateMetadata({
 
 export default async function ProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ handle: string }>;
+  searchParams: Promise<{ customise?: string }>;
 }) {
   const { handle } = await params;
+  const { customise } = await searchParams;
   const user = await findUserByHandle(decodeURIComponent(handle));
   if (!user) notFound();
 
@@ -55,6 +58,8 @@ export default async function ProfilePage({
       }}
       rank={user.listed ? await rankOf(user.id, "all", "cost") : null}
       own={own}
+      customise={own && customise === "1"}
+      back={`/profile/${user.handle}`}
     />
   );
 }

@@ -3,20 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Appwrite-backed persistence and API logic for the tokn leaderboard.",
+  "description": "Supabase-backed persistence and API logic for the tokn leaderboard.",
   "main": "src/index.ts",
   "scripts": {
     "provision": "node --experimental-strip-types src/provision.ts",
-    "provision:reset": "node --experimental-strip-types src/provision.ts --reset",
     "seed:pricing": "node --experimental-strip-types src/seed-pricing.ts",
+    "seed:demo": "node --experimental-strip-types src/seed-demo.ts",
     "verify": "node --experimental-strip-types src/verify.ts",
+    "audit:usage": "node --experimental-strip-types src/audit-usage.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test ../pricing/catalog.test.ts test/*.test.ts",
-    "dev": "node --experimental-strip-types src/server.ts"
+    "dev": "node --experimental-strip-types src/server.ts",
+    "schema:pg": "node --experimental-strip-types src/pg-schema.ts"
   },
   "dependencies": {
-    "@simplewebauthn/server": "^13.3.3",
-    "node-appwrite": "^17.0.0"
+    "@simplewebauthn/server": "^13.3.3"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

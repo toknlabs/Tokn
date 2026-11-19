@@ -88,9 +88,14 @@ export const COLLECTIONS: Collection[] = [
       // name can be changed by its owner, so it must never be the join key.
       { key: "githubId", type: "string", size: 32 },
       { key: "githubLogin", type: "string", size: 64 },
+      // Demo data, so it can be found and removed in one pass. Nothing reads
+      // this at runtime — it exists purely so seeded accounts never become
+      // indistinguishable from real ones once people start signing up.
+      { key: "seeded", type: "boolean", default: false },
     ],
     indexes: [
       { key: "handleLower_unique", type: "unique", attributes: ["handleLower"] },
+      { key: "seeded_idx", type: "key", attributes: ["seeded"] },
       { key: "createdAt_idx", type: "key", attributes: ["createdAt"], orders: ["DESC"] },
       { key: "githubId_idx", type: "key", attributes: ["githubId"] },
     ],
@@ -205,6 +210,30 @@ export const COLLECTIONS: Collection[] = [
       { key: "user_idx", type: "key", attributes: ["userId"] },
       { key: "tool_idx", type: "key", attributes: ["tool"] },
       { key: "model_idx", type: "key", attributes: ["model"] },
+    ],
+  },
+
+  {
+    id: "agent_daily",
+    name: "Daily agent runs",
+    purpose:
+      "One row per (user, day, tool): how many agent runs an app started that day and how long they ran. Sent by Eaon Desktop alongside its usage rows; the CLI has no notion of an agent run and never writes here. Row ids derive from the key, so a re-sync replaces a day rather than adding it again.",
+    attributes: [
+      { key: "userId", type: "string", size: 36, required: true },
+      { key: "day", type: "string", size: 10, required: true },
+      { key: "tool", type: "string", size: 32, required: true },
+      // Ceilings match the validation in repo/agents.ts, so a value the sync
+      // would refuse could not be written by hand either.
+      { key: "runs", type: "integer", default: 0, min: 0, max: 100_000 },
+      counter("totalMs"),
+      { key: "longestMs", type: "integer", default: 0, min: 0, max: 604_800_000 },
+      { key: "updatedAt", type: "datetime", required: true },
+    ],
+    indexes: [
+      { key: "user_day_tool_unique", type: "unique", attributes: ["userId", "day", "tool"] },
+      { key: "user_idx", type: "key", attributes: ["userId"] },
+      { key: "day_idx", type: "key", attributes: ["day"], orders: ["DESC"] },
+      { key: "tool_idx", type: "key", attributes: ["tool"] },
     ],
   },
 

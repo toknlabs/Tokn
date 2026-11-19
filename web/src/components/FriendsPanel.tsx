@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/Avatar";
+import { ModelName } from "@/components/BrandLogo";
+import type { SerializedLogo } from "@/lib/logos";
 
 /**
  * Friends: the roster, the requests waiting on either side, and a board of
@@ -28,6 +30,7 @@ interface BoardRow {
   isSelf: boolean;
   lastSyncAt?: string | null;
   topModel?: string | null;
+  topModelLogo?: SerializedLogo | null;
   activeDays: number;
 }
 
@@ -283,7 +286,16 @@ export function FriendsPanel() {
                     {!row.lastSyncAt && <span className="micro"> · never synced</span>}
                   </td>
                   <td className="sub" style={{ textAlign: "right", paddingRight: "1.1rem" }}>
-                    {row.topModel ? row.topModel.replace(/^claude-/, "") : ""}
+                    {row.topModel ? (
+                      <ModelName
+                        model={row.topModel}
+                        label={row.topModel.replace(/^claude-/, "")}
+                        logo={row.topModelLogo}
+                        size={13}
+                      />
+                    ) : (
+                      ""
+                    )}
                   </td>
                   <td style={{ textAlign: "right", width: "6rem" }}>
                     {row.lastSyncAt ? format(row.value, metric) : <span className="sub">—</span>}

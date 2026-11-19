@@ -1,6 +1,6 @@
 {
   "name": "toknhq",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Track your AI coding usage across every CLI you use, and publish it to the leaderboard.",
   "type": "module",
   "bin": {

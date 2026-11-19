@@ -1,4 +1,11 @@
-import { buildPriceTable, fetchCatalog, loadOverrides, type PriceDraft } from "../../pricing/catalog.ts";
+import {
+  buildPriceTable,
+  fetchCatalog,
+  fetchCatalogIfChanged,
+  loadOverrides,
+  normalizeModelId,
+  type PriceDraft,
+} from "../../pricing/catalog.ts";
 import { clearPricingCache, pricingTable, pricingUpdatedAt, upsertPrices, type PriceRow } from "./repo/pricing.ts";
 
 /**
@@ -63,6 +70,100 @@ async function runRefresh(): Promise<RefreshResult> {
   clearPricingCache();
   return { written, models: rows.length };
 }
+
+/* -------------------------------------------------- models nobody has priced */
+
+/**
+ * How often one server instance may ask models.dev about unpriced models.
+ *
+ * Some models are never in the catalog (local models, internal Codex review
+ * models), and they turn up in syncs all day. Asking costs a 304 while the
+ * catalog is unchanged, but a sync should not wait on even that every time.
+ */
+const LOOK_GAP_MS = 10 * 60 * 1000;
+
+function pricedBy(table: Record<string, unknown>, model: string): boolean {
+  // The same lookup `assess` prices with.
+  return Object.hasOwn(table, model) || Object.hasOwn(table, normalizeModelId(model));
+}
+
+/** What a lookup reads and writes, passed in so its decisions can be tested without a network. */
+export interface ModelLookupIO {
+  fetchCatalog: typeof fetchCatalogIfChanged;
+  table: () => Promise<Record<string, unknown>>;
+  write: (rows: PriceRow[]) => Promise<number>;
+  /** A full refresh already running, which may be about to price them. */
+  refreshing: () => Promise<unknown> | null;
+  now: () => number;
+}
+
+/**
+ * Price models the table has never seen, as soon as models.dev lists them.
+ *
+ * The daily cron alone left a model released at 07:00 unpriced until the next
+ * morning, and every sync that used it in between had those rows refused. A
+ * sync that meets an unpriced model calls this first. If the catalog has
+ * changed and now prices one of them, the whole table is rebuilt the same way
+ * the cron does it.
+ *
+ * The returned function gives back the models that are priced now. It never
+ * throws: if models.dev is down, the sync goes ahead and those rows are
+ * refused exactly as before.
+ */
+export function modelLookup(io: ModelLookupIO): (models: string[]) => Promise<string[]> {
+  /** The catalog version last read. A 304 against it means nothing is new. */
+  let catalogEtag: string | null = null;
+  let lastLookAt = -Infinity;
+  /** Kept apart from the cron's `inFlight`: a look that finds nothing must not stand in for a full refresh. */
+  let looking: Promise<void> | null = null;
+
+  async function look(models: string[]): Promise<void> {
+    const fetched = await io.fetchCatalog(catalogEtag);
+    if (!fetched) return;
+
+    const drafts = buildPriceTable(fetched.catalog, loadOverrides());
+    const ids = Object.fromEntries(drafts.map((draft) => [draft.modelId, true]));
+    // Rebuild only for a catalog that prices one of them. Either way this
+    // version has now been read, so the next look is a 304 until models.dev
+    // publishes something new.
+    if (models.some((model) => pricedBy(ids, model))) await io.write(drafts.map(toRow));
+    catalogEtag = fetched.etag;
+  }
+
+  return async (models) => {
+    if (models.length === 0) return [];
+
+    try {
+      const refreshing = io.refreshing();
+      if (refreshing) {
+        await refreshing;
+      } else if (looking) {
+        await looking;
+      } else if (io.now() - lastLookAt >= LOOK_GAP_MS) {
+        lastLookAt = io.now();
+        looking = look(models).finally(() => {
+          looking = null;
+        });
+        await looking;
+      }
+
+      const table = await io.table();
+      return models.filter((model) => pricedBy(table, model));
+    } catch (error) {
+      console.error(`pricing lookup failed: ${error instanceof Error ? error.message : String(error)}`);
+      return [];
+    }
+  };
+}
+
+/** One per server instance. `upsertPrices` drops the memoised table itself. */
+export const priceNewModels = modelLookup({
+  fetchCatalog: fetchCatalogIfChanged,
+  table: pricingTable,
+  write: upsertPrices,
+  refreshing: () => inFlight,
+  now: Date.now,
+});
 
 /**
  * Decide from the age of the stored table, not from which model ids it holds.

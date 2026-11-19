@@ -62,6 +62,8 @@ export interface Profile {
   createdAt: string;
   githubId?: string | null;
   githubLogin?: string | null;
+  /** Demo data. See `seed-demo.ts`. Never set on a real signup. */
+  seeded?: boolean;
 }
 
 /** What is safe to serialise to a browser or the CLI. */
@@ -104,6 +106,26 @@ export async function findProfileById(userId: string): Promise<Profile | null> {
     if (isNotFound(error)) return null;
     throw error;
   }
+}
+
+/** Appwrite takes at most 100 values in one `equal`. */
+const IDS_PER_QUERY = 100;
+
+/** Several profiles at once, in as few reads as the ids allow. Ids with no profile are left out. */
+export async function findProfilesByIds(userIds: readonly string[]): Promise<Profile[]> {
+  const unique = [...new Set(userIds)];
+  const out: Profile[] = [];
+
+  for (let start = 0; start < unique.length; start += IDS_PER_QUERY) {
+    const chunk = unique.slice(start, start + IDS_PER_QUERY);
+    const page = await db().listDocuments(DB_ID, "profiles", [
+      Query.equal("$id", chunk),
+      Query.limit(chunk.length),
+    ]);
+    out.push(...(page.documents as unknown as Profile[]));
+  }
+
+  return out;
 }
 
 export async function findProfileByHandle(handle: string): Promise<Profile | null> {
@@ -235,6 +257,11 @@ export async function deleteAccount(userId: string): Promise<{ removed: Record<s
   };
 
   await purge("usage_daily");
+  // Provisioned later than the rest; an install without it has nothing to
+  // remove there, and that must not stop the account being erased.
+  await purge("agent_daily").catch((error) => {
+    if (!isNotFound(error)) throw error;
+  });
   await purge("devices");
   await purge("link_codes");
   await purge("sessions");

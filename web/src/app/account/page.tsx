@@ -46,7 +46,12 @@ async function signOut() {
   redirect("/");
 }
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ customise?: string }>;
+}) {
+  const { customise } = await searchParams;
   const user = await currentUser();
   if (!user) redirect("/login?next=/account");
 
@@ -102,11 +107,11 @@ export default async function AccountPage() {
         rank={await rankOf(user.id, "all", "cost")}
         own
         identity={false}
+        customise={customise === "1"}
+        back="/account"
       />
 
-      <hr className="divider" style={{ marginTop: "1rem" }} />
-
-      <section>
+      <section className="account-panel" aria-label="Connected machines">
         <div className="row spread">
           <p className="block-label">connected machines</p>
           <span className="micro">
@@ -207,9 +212,9 @@ export default async function AccountPage() {
         )}
       </section>
 
-      <hr className="divider" />
-
       <section
+        className="account-panel"
+        aria-label="Account actions"
         style={{
           display: "flex",
           justifyContent: "space-between",

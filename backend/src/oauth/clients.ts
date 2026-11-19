@@ -54,6 +54,14 @@ export const OAUTH_CLIENTS: readonly OAuthClient[] = [
     scopes: ["profile", "usage:write"],
     loopbackPath: "/callback",
   },
+  {
+    // https://github.com/stablyai/orca — Settings → Stats → Publish usage.
+    id: "orca",
+    name: "Orca",
+    icon: "/apps/orca.png",
+    scopes: ["profile", "usage:write"],
+    loopbackPath: "/tokn/callback",
+  },
 ];
 
 export function findOAuthClient(clientId: unknown): OAuthClient | null {

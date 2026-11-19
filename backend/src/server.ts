@@ -158,6 +158,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n  tokn backend on http://localhost:${PORT}`);
-  console.log(`  appwrite ${ENV.endpoint} project ${ENV.projectId} db ${ENV.databaseId}\n`);
+  console.log(`  supabase ${ENV.supabaseUrl} schema ${ENV.schema}\n`);
   console.log(`  point the CLI at it:  TOKN_HOST=http://localhost:${PORT} tokn link\n`);
 });

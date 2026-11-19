@@ -38,11 +38,15 @@ Four endpoints, matching `cli/src/core/api.ts`:
 | `POST /api/cli/sync` | bearer | upload a scan |
 | `GET /api/cli/pricing` | none | the rate table |
 
-**Sync is an upsert keyed on `(user, day, model, fast)`.** A full rescan must
-replace a day's figures, never add to them — that is what lets `tokn sync` run
-as often as you like and lets a corrected scan heal a bad one. Rows that fail
-validation are skipped rather than failing the whole upload; the response
-reports both `accepted` and `skipped`.
+**Sync is an upsert keyed on `(user, day, tool, model, fast)`.** A full rescan
+must replace a day's figures, never add to them — that is what lets `tokn sync`
+run as often as you like and lets a corrected scan heal a bad one. Rows that
+fail validation are skipped rather than failing the whole upload. The response
+reports `accepted` and `skipped`, lists refused rows in `rejected` (with a
+reason, such as a day over the per-account ceilings in
+[`backend/README.md`](../backend/README.md#integrity)), names models priced on
+the spot in `newlyPriced`, and gives the board's `updatedAt` and
+`nextUpdateAt`.
 
 Run the CLI against a local dashboard with:
 
@@ -273,11 +277,21 @@ presentation — nothing here changes what is measured or how anyone ranks.
   every visitor (`mono` included, for a profile that wants to be pure type).
 - **Avatar** — generated from the handle, first initial on an accent block, or
   the linked GitHub picture.
-- **Headline figures** — which four of eleven stats lead the page.
-- **Sections** — which of six blocks appear and in what order.
+- **Headline figures** — which four of twelve stats lead the page.
+- **Sections** — which sections appear, in what order, at what width, and in
+  which look. See [Profile sections](#profile-sections) below.
 
 Stored as a JSON blob in `profiles.prefs`; the vocabulary, defaults and parser
-live in `lib/prefs.ts`.
+live in `lib/prefs.ts`. The blob holds `accent`, `avatar`, `blocks` (the
+visible sections, in order), `stats`, `looks` (only the ones that differ from
+the default), `half` (the half-width sections) and `seen`.
+
+`seen` is the list of sections that existed when the blob was written. A
+section added later is inserted into an old layout where it sits in the
+default order, instead of staying hidden until the owner finds it in settings;
+one the owner turned off stays off. Blobs from before `seen` existed are read
+as having seen the original seven (`LEGACY_BLOCKS`). An empty `blocks` list is
+a real choice and stays empty.
 
 Two rules to keep:
 
@@ -293,9 +307,10 @@ Everything already reads `var(--main)`, so one attribute recolours the profile
 while the site chrome stays put.
 
 **Adding a field means provisioning it.** Putting an attribute in
-`backend/src/schema.ts` does not create it; run `cd backend && npm run
-provision`. Until you do, saves fail with `Unknown attribute` in the server log
-and the form silently does nothing.
+`backend/src/schema.ts` does not create the column; run `cd backend && npm run
+provision` and apply the SQL it prints in the Supabase SQL editor. Until you
+do, saves fail with a PostgREST column error in the server log and the form
+silently does nothing. A new key inside the `prefs` blob needs none of this.
 
 ### Plans
 
@@ -361,6 +376,89 @@ recorded" taken from those were 30-day numbers under an all-time caption.
 `allTime.models` and `allTime.days` count distinct models and days over the
 whole history, in the same single pass.
 
+### The models section
+
+`components/ModelMix.tsx` on `/stats`: a ring with a legend, then a full table.
+Two questions, so two views of the same rows — the ring is a share and only has
+to be read at a glance, the table is a comparison and needs columns.
+
+The ring is ordered by **tokens** and the table by **spend**, and they
+genuinely disagree (a cheap model can carry a third of the work for two percent
+of the bill). That is the point of showing both, and the footnote says so
+rather than leaving a reader to spot it.
+
+Two things that took a second pass:
+
+- **The shade ramp is written out, not interpolated.** A linear ramp put the
+  top two stops within a few percent of each other, so the two largest arcs
+  read as one solid band — the exact comparison the chart exists to make.
+  `RAMP` steps steeply (100, 58, 38, …) following the cost bar's precedent, and
+  floors well above the background so the smallest slice stays visible.
+- **Arcs are separated by a hairline.** With one hue at six strengths,
+  neighbours are close by design; the gap is what keeps two of them legible as
+  two. It is clamped so a sliver does not go negative and wrap the ring.
+
+Five colours cannot give eight models eight hues, so the tail folds into one
+`other` slice and every segment is named in the legend. The shade never has to
+carry the meaning alone.
+
+Per-model developer counts come from a `users` set in `siteStats`, mirroring
+what `byTool` already did.
+
+`modelLabel` in `lib/pricing.ts` handles both naming conventions. Anthropic ids
+are hyphen-separated digits — `claude-haiku-4-5` means 4.5 — so those segments
+join with dots. No other provider names models that way: `gpt-6-astra` and
+`deepseek-v4-flash` are words, and the old dot-join rendered them "Gpt 6.astra"
+and "Deepseek v4.flash". Non-Claude ids join with spaces, with a small table of
+families whose capitalisation is not just first-letter-upper (GPT, GLM,
+DeepSeek).
+
+**Hovering reports a model.** `ModelRing.tsx` is the client half — the ring and
+legend — so the table stays server-rendered and ships no JavaScript. Pointing
+at an arc or a legend row dims the rest, swaps the ring's centre, and fills in
+the line underneath: tokens, spend and its share, requests, developers.
+
+Four decisions there:
+
+- **The detail line is always populated**, showing the largest model at rest.
+  A strip that appears on hover shoves the table down the page every time the
+  pointer crosses the chart, and reserving an empty gap is worse than filling
+  it with something true.
+- **No floating tooltip.** A box tracking the cursor is chrome this design does
+  not have anywhere else, and it is unreachable by keyboard and useless on a
+  phone.
+- **Arcs and legend rows are real buttons**, so hover, tap and Tab all do the
+  same thing.
+- **The active arc widens rather than just staying bright.** A slice low on the
+  ramp is dark to begin with, so leaving it at full opacity while the others
+  fade still reads as "everything is dim". Stroke width is independent of
+  shade, so it marks the sixth slice as clearly as the first.
+
+The table's columns are model, spend, share of spend, tokens, share of tokens,
+requests, per request, effective rate and developers, over the last 30 days.
+Models are grouped by `canonicalModelId`, so `claude-opus-5.5` and
+`claude-opus-5-5` are one row here, on profiles and in the about page's model
+count (see [`backend/README.md`](../backend/README.md#model-ids-are-grouped-not-rewritten)).
+
+### Model and tool logos
+
+Model and tool names carry their maker's logo on the board's top-model column,
+`/stats` (ring, table and tool bars), profiles, the friends board
+(`topModelLogo` in `/api/friends/board`) and the Eaon pages. The components are
+`ModelLogo`, `ToolLogo`, `ModelName` and `ToolName` in
+`components/BrandLogo.tsx`. A page calls `resolveModelLogos()` from
+`lib/logos-server.ts` once with every model it will show and passes the
+resulting `logoMap` down. Known models resolve from the bundled
+`lib/logo-catalog.generated.ts` with no I/O. A model the bundle does not know
+is looked up on models.dev (cached a day under the `model-logos` tag). If only
+its lab id is known, the logo is drawn as a CSS mask over
+`/api/logos/model/<id>`. Logos are sanitised to `currentColor`, so they follow
+the theme. The pipeline, sources and sanitiser are in
+[`pricing/README.md`](../pricing/README.md#logos).
+
+`ShareBars` and `PagedBars` rows take an optional `icon`, which is how the
+logos get into the bar charts.
+
 ### Profiles
 
 `/profile/<handle>` is a stack of blocks with nothing drawn around them: a
@@ -374,6 +472,83 @@ provider from the host, so a user pastes a link and the right icon and label
 appear; anything unrecognised gets a globe and its hostname, which keeps
 personal sites first-class. `normalizeLink` accepts bare hosts and rejects
 anything that is not http(s), so `javascript:` can never reach an href.
+
+The page is `components/ProfileView.tsx`, shared by `/profile/<handle>` and
+`/account`. From the top: one header with the avatar, name, handle, rank and
+private/unlisted tags, the share and edit buttons, bio, join date and links;
+then a toolbar ("Usage overview", all-time totals, time since the last sync)
+holding the owner's **customise layout** button; then a row of jump links
+(Overview, Activity, Usage, Details) to the first visible section in each
+group; then the sections.
+
+#### Profile sections
+
+Every section is one entry in `BLOCKS` in `lib/prefs.ts`, with a label in
+`BLOCK_LABELS` and a list of looks in `LOOKS`. Offered today:
+
+| Key | Label | Looks (first is the default) |
+|---|---|---|
+| `figures` | headline figures | large, small |
+| `activity` | activity grid | squares, by month, numbers |
+| `standing` | rank | cells, list, tags |
+| `models` | models | bars, table, ring |
+| `tools` | tools | bars, table, ring |
+| `records` | records | cells, list |
+| `rhythm` | by weekday | columns, bars |
+| `plans` | what you pay for | list |
+| `summary` | summary table | grid, list, cells |
+
+`rank` only appears when the account is on the board and `what you pay for`
+only when plans are declared. Records are the biggest day, week and month and
+the longest streak; by weekday is the share of spend falling on each day of
+the week. Both are computed in `lib/profile-stats.ts`.
+
+**Removed on 2026-11-17, at the owner's request:** `spend` (spend per day),
+`tokens` (token mix), `costs` (where the money went) and `lately` (last 7 and
+30 days). They are listed in `REMOVED_BLOCKS` and remain in `BLOCKS`, so old
+blobs that name them still parse and `seen` keeps recording them. `parsePrefs`
+drops them, so the profile, its customise mode and the settings form never
+draw, offer or reorder them. Their renderers (`DailySpend.tsx`,
+`CostAnatomy.tsx`, the token views) are still in the tree. To bring one back,
+take it out of `REMOVED_BLOCKS`. Owners whose saved layout named it will get it
+back where they had it.
+
+**Looks change the drawing, never the figures.** Each look of a section takes
+the same rows its siblings do. The shared renderers are in
+`components/ProfileLooks.tsx` (`Figures`, `Columns`, `Breakdown`, `SplitBar`)
+and `components/Cells.tsx`. Settings shows a small picture of each look from
+`components/LookGlyph.tsx` rather than only a word. Only non-default looks are
+stored.
+
+**Widths.** Sections are full width or half width. `layout()` in
+`ProfileView.tsx` pairs consecutive half-width sections two to a row, in the
+owner's order. A half-width section with no partner is drawn full width,
+because a lone half leaves a hole. Every `.pblock` is a size container
+(`container-type: inline-size`), so a section reflows to its own width at
+560px and does not need to know whether it is paired. Under 720px everything is
+one column.
+
+**Two places to change the layout:**
+
+- `/account/settings`, under *sections*: a checkbox, up/down arrows, look
+  buttons and a full/half toggle for every offered section, saved with the
+  rest of the form.
+- On the profile itself: **customise layout** (`?customise=1`, owner only)
+  gives each section hide, ↑, ↓ and width buttons, and lists hidden sections at
+  the bottom with a button to bring each back. Each button is a plain form post
+  to the `changeLayout` server action in `app/profile/actions.ts`, so it works
+  before JavaScript loads. The action only ever edits the signed-in user's own
+  layout (no user id travels in the form). It returns to `/account` or the
+  owner's own profile, never anywhere the form names, and lands on the edited
+  section with `#<block>`. `savePrefs` in `lib/auth.ts` writes only the
+  `prefs` column; `saveProfile` would blank the fields the form did not send.
+
+**Hover panels keep a fixed height.** A detail panel under a chart that grows
+or shrinks with the hovered item moves the chart under the pointer, which
+changes the hovered item, which resizes the panel again. The profile once
+jittered like that. Panels that follow the pointer reserve their largest shape
+up front (fixed rows, hidden rather than removed when empty). See
+`DailySpend.tsx` and `ModelRing.tsx`.
 
 ## The footer
 

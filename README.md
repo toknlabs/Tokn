@@ -51,7 +51,7 @@ between a useful number and a wrong one.
 |---|---|
 | `cli/` | the command line tool — scanning, pricing, sync, terminal dashboard |
 | `web/` | the site: leaderboard, profiles, friends, stats |
-| `backend/` | data access and service layer, on Appwrite |
+| `backend/` | data access and service layer, on Supabase Postgres |
 | `pricing/` | shared models.dev catalog builder for the CLI fallback and the server table |
 
 Each has its own README covering how it works and why.
@@ -59,7 +59,7 @@ Each has its own README covering how it works and why.
 ## Development
 
 ```bash
-cp .env.example .env     # fill in Appwrite and GitHub OAuth credentials
+cp .env.example .env     # fill in Supabase and GitHub OAuth credentials
 cd web && npm install && npm run dev
 cd cli && npm install && npm run build && npm link
 ```
@@ -70,9 +70,14 @@ The CLI defaults to `http://localhost:3000`. `TOKN_HOST` points it elsewhere.
 
 The server never stores a number the client chose freely. Costs are recomputed
 from token counts against the server's own price table, and submissions that
-describe something a machine could not have done are rejected. See
+describe something a machine could not have done are rejected. That includes
+ceilings per account per day (output tokens, all tokens, cost), so a forged
+day cannot be spread across many rows to slip under the per-row limits. See
 `backend/src/repo/integrity.ts`, which also documents what this does not
-prevent.
+prevent, and [`backend/README.md`](backend/README.md#integrity) for the
+numbers and the `audit:usage` cleanup script.
+
+Release notes are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Licence
 
